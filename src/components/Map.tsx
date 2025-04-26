@@ -847,11 +847,14 @@ const Map = ({ origin, destination, segments }: MapProps) => {
   
   // Mock coordinates for NYC boroughs (in a real app, would use geocoding API)
   const mockCoordinates: Record<string, Coordinates> = {
+    // Boroughs
     'Manhattan': [40.7831, -73.9712],
     'Brooklyn': [40.6782, -73.9442],
     'Queens': [40.7282, -73.7949],
     'Bronx': [40.8448, -73.8648],
     'Staten Island': [40.5795, -74.1502],
+    
+    // Popular locations
     'Times Square': [40.7580, -73.9855],
     'Central Park': [40.7829, -73.9654],
     'Prospect Park': [40.6602, -73.9690],
@@ -868,7 +871,23 @@ const Map = ({ origin, destination, segments }: MapProps) => {
     'Barclays Center': [40.6826, -73.9754],
     'Columbia University': [40.8075, -73.9626],
     'NYU': [40.7295, -73.9965],
-    'Penn Station, New York, NY 10119': [40.7497, -73.9939],
+    'Penn Station': [40.7497, -73.9939],
+    'SoHo': [40.7233, -74.0030],
+    'Great Kills': [40.5457, -74.1508],
+    'Bronx High School of Science': [40.8776, -73.8931],
+    
+    // Hospitals
+    'NYU Langone Medical Center': [40.7421, -73.9739],
+    'Mount Sinai Hospital': [40.7900, -73.9526],
+    'NewYork-Presbyterian Hospital': [40.7644, -73.9554],
+    'Bellevue Hospital Center': [40.7392, -73.9766],
+    'NYC Health + Hospitals/Kings County': [40.6553, -73.9449],
+    'Maimonides Medical Center': [40.6364, -73.9986],
+    'NYC Health + Hospitals/Elmhurst': [40.7444, -73.8803],
+    'NYC Health + Hospitals/Queens': [40.7106, -73.8250],
+    'NYC Health + Hospitals/Lincoln': [40.8161, -73.9262],
+    'Montefiore Medical Center': [40.8810, -73.8781],
+    'Staten Island University Hospital': [40.5847, -74.0875]
   };
   
   // Get coordinates from location string or use mock data
@@ -879,16 +898,23 @@ const Map = ({ origin, destination, segments }: MapProps) => {
     }
 
     // Normalize the location string
-    const normalizedLocation = location.toLowerCase();
-
-    // Try to match with known locations first
+    const normalizedLocation = location.toLowerCase().trim();
+    
+    // First, check for exact matches with hospitals and specific locations
+    for (const [locationName, coords] of Object.entries(mockCoordinates)) {
+      if (normalizedLocation === locationName.toLowerCase()) {
+        return coords;
+      }
+    }
+    
+    // Then check for partial matches
     for (const [locationName, coords] of Object.entries(mockCoordinates)) {
       if (normalizedLocation.includes(locationName.toLowerCase())) {
         return coords;
       }
     }
 
-    // Check for specific NYC neighborhoods
+    // Check for specific NYC neighborhoods and areas
     if (normalizedLocation.includes('manhattan')) {
       return mockCoordinates.Manhattan;
     } else if (normalizedLocation.includes('brooklyn')) {
@@ -897,12 +923,39 @@ const Map = ({ origin, destination, segments }: MapProps) => {
       return mockCoordinates.Queens;
     } else if (normalizedLocation.includes('bronx')) {
       return mockCoordinates.Bronx;
-    } else if (normalizedLocation.includes('staten island')) {
-      return mockCoordinates.StatenIsland;
+    } else if (normalizedLocation.includes('staten island') || normalizedLocation.includes('great kills')) {
+      return mockCoordinates['Staten Island'];
+    } else if (normalizedLocation.includes('hospital') || normalizedLocation.includes('medical center')) {
+      // Default hospital coordinates if not found by name
+      return mockCoordinates['Bellevue Hospital Center'];
+    }
+
+    // Common streets in NYC - provide approximate locations
+    if (normalizedLocation.includes('broadway')) {
+      return [40.7512, -73.9886]; // Mid Broadway
+    } else if (normalizedLocation.includes('5th avenue') || normalizedLocation.includes('fifth avenue')) {
+      return [40.7540, -73.9800]; // Mid 5th Ave
+    } else if (normalizedLocation.includes('times square')) {
+      return mockCoordinates['Times Square'];
+    }
+    
+    // Handle addresses with numbers - extract borough if possible
+    if (/\d+/.test(normalizedLocation)) {
+      if (normalizedLocation.includes('manhattan')) {
+        return [40.7831 + Math.random() * 0.04 - 0.02, -73.9712 + Math.random() * 0.04 - 0.02];
+      } else if (normalizedLocation.includes('brooklyn')) {
+        return [40.6782 + Math.random() * 0.04 - 0.02, -73.9442 + Math.random() * 0.04 - 0.02];
+      } else if (normalizedLocation.includes('queens')) {
+        return [40.7282 + Math.random() * 0.04 - 0.02, -73.7949 + Math.random() * 0.04 - 0.02];
+      } else if (normalizedLocation.includes('bronx')) {
+        return [40.8448 + Math.random() * 0.04 - 0.02, -73.8648 + Math.random() * 0.04 - 0.02];
+      } else if (normalizedLocation.includes('staten')) {
+        return [40.5795 + Math.random() * 0.04 - 0.02, -74.1502 + Math.random() * 0.04 - 0.02];
+      }
     }
 
     // If still not found, generate a random location near the center of NYC
-    console.warn("Location not found, using a generated coordinate:", location);
+    console.warn("Location not found in database, generating coordinates for:", location);
     return generateRandomNYCLocation();
   };
   
