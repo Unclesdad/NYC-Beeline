@@ -1,1 +1,1 @@
-self.__REACT_LOADABLE_MANIFEST="{\"pages\\\\route-planner.tsx -> @/components/Map\":{\"id\":\"pages\\\\route-planner.tsx -> @/components/Map\",\"files\":[\"static/chunks/src_components_Map_tsx.js\"]}}"
+self.__REACT_LOADABLE_MANIFEST="{\"pages/route-planner.tsx -> @/components/Map\":{\"id\":\"pages/route-planner.tsx -> @/components/Map\",\"files\":[\"static/chunks/src_components_Map_tsx.js\"]}}"

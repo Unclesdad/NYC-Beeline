@@ -12,7 +12,7 @@ const AnimatedBackground: React.FC<AnimatedBackgroundProps> = ({
   theme = 'honey',
   intensity = 'medium',
   pattern = 'hexagon'
-}) => {
+}: AnimatedBackgroundProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
   // Define theme colors with enhanced gradients

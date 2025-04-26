@@ -2,8 +2,8 @@
   "/_app": "pages/_app.js",
   "/_error": "pages/_error.js",
   "/_document": "pages/_document.js",
-  "/route-planner": "pages/route-planner.js",
   "/": "pages/index.js",
-  "/api/routes": "pages/api/routes.js",
-  "/api/address-suggestions": "pages/api/address-suggestions.js"
+  "/route-planner": "pages/route-planner.js",
+  "/api/address-suggestions": "pages/api/address-suggestions.js",
+  "/api/routes": "pages/api/routes.js"
 }

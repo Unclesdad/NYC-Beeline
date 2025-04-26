@@ -358,52 +358,52 @@ export default async function handler(
         const transferScore = Math.max(0, 1 - (numTransfers * 0.15));
         
         // Adjust weights based on user priority
-        let timeWeight = 0.40;
-        let costWeight = 0.35;
-        let comfortWeight = 0.15;
-        let transferWeight = 0.10;
+        let timeWeight = 0.70;  // Significantly increased base time weight
+        let costWeight = 0.15;
+        let comfortWeight = 0.10;
+        let transferWeight = 0.05;
         
         switch (userPriority) {
           case 'speed':
-            timeWeight = 0.60;
-            costWeight = 0.20;
-            comfortWeight = 0.10;
-            transferWeight = 0.10;
+            timeWeight = 0.85;    // Even more emphasis on time
+            costWeight = 0.08;
+            comfortWeight = 0.04;
+            transferWeight = 0.03;
             break;
           case 'cost':
-            timeWeight = 0.20;
-            costWeight = 0.60;
+            timeWeight = 0.60;    // Still maintain high time priority
+            costWeight = 0.25;
             comfortWeight = 0.10;
-            transferWeight = 0.10;
+            transferWeight = 0.05;
             break;
           case 'comfort':
-            timeWeight = 0.20;
-            costWeight = 0.20;
-            comfortWeight = 0.45;
-            transferWeight = 0.15;
+            timeWeight = 0.60;    // Still maintain high time priority
+            costWeight = 0.15;
+            comfortWeight = 0.20;
+            transferWeight = 0.05;
             break;
           default: // 'balanced'
-            // Keep the default weights
+            // Keep the default weights defined above
             break;
         }
         
         // Further adjust comfort weight based on noise sensitivity
         if (userNoise === 'high') {
-          // If user is highly sensitive to noise, increase comfort weight slightly
-          comfortWeight += 0.1;
-          // And reduce other weights proportionally
-          timeWeight -= 0.04;
-          costWeight -= 0.03;
-          transferWeight -= 0.03;
+          // Reduce the comfort weight adjustment to maintain time priority
+          comfortWeight += 0.05;
+          // And reduce other weights proportionally, taking more from cost than time
+          timeWeight -= 0.02;
+          costWeight -= 0.02;
+          transferWeight -= 0.01;
         }
         
         // Adjust for safety preference
         if (userSafety === 'high') {
-          // For high safety preference, fewer transfers and higher comfort are preferred
-          transferWeight += 0.05;
-          comfortWeight += 0.05;
-          timeWeight -= 0.05;
-          costWeight -= 0.05;
+          // Minimal adjustments to maintain time priority
+          transferWeight += 0.03;
+          comfortWeight += 0.02;
+          timeWeight -= 0.02;
+          costWeight -= 0.03;
         }
         
         // Add wheelchair accessibility factor if needed
