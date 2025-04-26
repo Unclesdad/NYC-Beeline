@@ -71,16 +71,16 @@ const Routes = () => {
       
       const data = await response.json();
       
-      // Make sure data is an array before setting state
-      if (Array.isArray(data)) {
-        setRoutes(data);
+      // API returns an object with a 'routes' property containing the array
+      if (data && data.routes && Array.isArray(data.routes)) {
+        setRoutes(data.routes);
         
-        if (data.length > 0) {
-          setSelectedRoute(data[0].id);
-          setMapData(data[0].segments);
+        if (data.routes.length > 0) {
+          setSelectedRoute(data.routes[0].id);
+          setMapData(data.routes[0].segments);
         }
       } else {
-        console.error('Expected array of routes but got:', data);
+        console.error('Expected object with routes array but got:', data);
         setRoutes([]);
       }
       
