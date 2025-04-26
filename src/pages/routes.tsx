@@ -28,42 +28,59 @@ interface RouteSegment {
 
 export default function Routes() {
   const router = useRouter();
-  const { from, to } = router.query;
+  const { from, to, priority, noise, safety } = router.query;
   
   const [loading, setLoading] = useState(true);
   const [routes, setRoutes] = useState<RouteOption[]>([]);
   const [selectedRoute, setSelectedRoute] = useState<string | null>(null);
-  const [mapData, setMapData] = useState<any>(null);
+  const [mapData, setMapData] = useState({
+    fromCoords: null,
+    toCoords: null,
+    distance: 0,
+  });
 
-  // Fetch routes from our API
+  // Get routes when from and to are set
   useEffect(() => {
     if (from && to) {
-      setLoading(true);
-      
-      // Fetch from our API endpoint
-      fetch(`/api/routes?from=${encodeURIComponent(from as string)}&to=${encodeURIComponent(to as string)}`)
-        .then(response => {
+      const fetchRoutes = async () => {
+        setLoading(true);
+        try {
+          // Pass user preferences to the API
+          const priorityParam = priority || 'balanced';
+          const noiseParam = noise || 'moderate';
+          const safetyParam = safety || 'moderate';
+          
+          const response = await fetch(
+            `/api/routes?from=${encodeURIComponent(from as string)}&to=${encodeURIComponent(to as string)}&priority=${priorityParam}&noise=${noiseParam}&safety=${safetyParam}`
+          );
+          
           if (!response.ok) {
-            throw new Error('Network response was not ok');
+            throw new Error('Failed to fetch routes');
           }
-          return response.json();
-        })
-        .then(data => {
+          
+          const data = await response.json();
           setRoutes(data.routes);
           setMapData({
             fromCoords: data.fromCoords,
             toCoords: data.toCoords,
-            distance: data.distance
+            distance: data.distance,
           });
-          setSelectedRoute(data.routes[0].id);
+          
+          // Select the first route by default
+          if (data.routes && data.routes.length > 0) {
+            setSelectedRoute(data.routes[0].id);
+          }
+          
+        } catch (error) {
+          console.error('Error fetching routes:', error);
+        } finally {
           setLoading(false);
-        })
-        .catch(error => {
-          console.error("Error fetching routes:", error);
-          setLoading(false);
-        });
+        }
+      };
+      
+      fetchRoutes();
     }
-  }, [from, to]);
+  }, [from, to, priority, noise, safety]);
 
   // Helper function to get comfort color class
   const getComfortColorClass = (comfort: 'high' | 'medium' | 'low') => {

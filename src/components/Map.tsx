@@ -106,6 +106,9 @@ const Map = ({ from, to, route }: MapProps) => {
     'Central Park': [40.7829, -73.9654],
     'Prospect Park': [40.6602, -73.9690],
     'Flushing Meadows': [40.7466, -73.8422],
+    'Flushing': [40.7654, -73.8318],
+    'Bayside': [40.7612, -73.7716],
+    'Main St': [40.7590, -73.8300],
     'Yankee Stadium': [40.8296, -73.9262],
     'Coney Island': [40.5755, -73.9707],
     'JFK Airport': [40.6413, -73.7781],
@@ -119,11 +122,37 @@ const Map = ({ from, to, route }: MapProps) => {
   
   // Get coordinates from location string or use mock data
   const getCoordinates = (location: string): Coordinates => {
-    // Try to find in our mock data
+    // Normalize the location string for better matching
+    const normalizedLocation = location.toLowerCase();
+    
+    // Try to find in our mock data - first with exact matches
     for (const [name, coords] of Object.entries(mockCoordinates)) {
-      if (location.toLowerCase().includes(name.toLowerCase())) {
+      if (normalizedLocation.includes(name.toLowerCase())) {
         return coords;
       }
+    }
+    
+    // If no specific match, try to determine which borough it's in
+    if (normalizedLocation.includes('queens') || 
+        normalizedLocation.includes('flushing') || 
+        normalizedLocation.includes('bayside') ||
+        normalizedLocation.includes('jamaica') ||
+        normalizedLocation.includes('astoria')) {
+      return mockCoordinates['Queens'];
+    }
+    
+    if (normalizedLocation.includes('brooklyn') ||
+        normalizedLocation.includes('williamsburg') ||
+        normalizedLocation.includes('park slope')) {
+      return mockCoordinates['Brooklyn'];
+    }
+    
+    if (normalizedLocation.includes('bronx')) {
+      return mockCoordinates['Bronx'];
+    }
+    
+    if (normalizedLocation.includes('staten')) {
+      return mockCoordinates['Staten Island'];
     }
     
     // Default to Manhattan if not found
@@ -138,6 +167,10 @@ const Map = ({ from, to, route }: MapProps) => {
     if (from && to) {
       const fromCoords = getCoordinates(from);
       const toCoords = getCoordinates(to);
+      
+      // Log coordinates for debugging
+      console.log(`Map - From location: "${from}" → coordinates: [${fromCoords[0]}, ${fromCoords[1]}]`);
+      console.log(`Map - To location: "${to}" → coordinates: [${toCoords[0]}, ${toCoords[1]}]`);
       
       setStartCoords(fromCoords);
       setEndCoords(toCoords);

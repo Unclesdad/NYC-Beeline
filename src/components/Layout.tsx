@@ -1,5 +1,6 @@
 import Head from 'next/head';
 import Link from 'next/link';
+import Image from 'next/image';
 import { ReactNode } from 'react';
 
 interface LayoutProps {
@@ -20,18 +21,48 @@ export default function Layout({
       <Head>
         <title>{title}</title>
         <meta name="description" content={description} />
-        <link rel="icon" href="/favicon.ico" />
+        <link rel="icon" href="/images/bee-icon.svg" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       </Head>
 
       <header className="bg-white shadow-sm">
         <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center">
-            <Link href="/" className="text-2xl font-bold text-primary-600">
+          <div className="flex items-center space-x-2">
+            <div className="w-8 h-8 relative">
+              <Image 
+                src="/images/bee-icon.svg" 
+                alt="Bee Logo" 
+                width={32} 
+                height={32} 
+                className="object-contain"
+                priority
+              />
+            </div>
+            <Link href="/" className="text-2xl font-bold text-primary-600 flex items-center">
               NYC Beeline
             </Link>
           </div>
-          <div className="flex space-x-4">
+          <div className="flex space-x-6">
+            <Link
+              href="/"
+              className={`${
+                currentPage === 'home'
+                  ? 'text-primary-600 font-medium'
+                  : 'text-gray-600 hover:text-primary-600'
+              }`}
+            >
+              Home
+            </Link>
+            <Link
+              href="/routes"
+              className={`${
+                currentPage === 'routes'
+                  ? 'text-primary-600 font-medium'
+                  : 'text-gray-600 hover:text-primary-600'
+              }`}
+            >
+              Routes
+            </Link>
             <Link
               href="/about"
               className={`${
@@ -62,7 +93,18 @@ export default function Layout({
         <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div>
-              <h3 className="text-lg font-semibold mb-4">NYC Beeline</h3>
+              <div className="flex items-center space-x-2 mb-4">
+                <div className="w-6 h-6 relative">
+                  <Image 
+                    src="/images/bee-icon.svg" 
+                    alt="Bee Logo" 
+                    width={24} 
+                    height={24} 
+                    className="object-contain invert" 
+                  />
+                </div>
+                <h3 className="text-lg font-semibold">NYC Beeline</h3>
+              </div>
               <p className="text-gray-300">
                 Making inter-borough travel in New York City faster, cheaper, and more comfortable.
               </p>

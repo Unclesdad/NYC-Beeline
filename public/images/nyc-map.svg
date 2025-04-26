@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" width="100%" height="100%">
+  <rect width="600" height="400" fill="#F0F4F8"/>
+  
+  <!-- Water -->
+  <path d="M0,200 Q100,180 150,230 Q200,280 300,250 Q400,220 450,250 Q500,280 600,260 L600,400 L0,400 Z" fill="#B3E0FF"/>
+  
+  <!-- Manhattan -->
+  <path d="M250,120 Q260,140 270,170 Q280,200 290,220 Q300,240 290,280 Q280,320 250,350 Q245,330 240,300 Q235,270 230,240 Q225,210 220,180 Q215,150 230,130 Z" fill="#E6E6E6" stroke="#999999" stroke-width="1.5"/>
+  
+  <!-- Brooklyn -->
+  <path d="M310,280 Q320,260 340,260 Q360,260 380,270 Q400,280 410,300 Q420,320 420,350 Q400,360 380,350 Q360,340 340,330 Q320,320 310,300 Z" fill="#E6E6E6" stroke="#999999" stroke-width="1.5"/>
+  
+  <!-- Queens -->
+  <path d="M330,200 Q350,190 380,180 Q410,170 440,180 Q470,190 490,220 Q510,250 500,280 Q490,310 470,330 Q450,350 420,360 Q410,330 400,300 Q390,270 380,250 Q370,230 350,220 Z" fill="#E6E6E6" stroke="#999999" stroke-width="1.5"/>
+  
+  <!-- Bronx -->
+  <path d="M280,80 Q300,70 330,70 Q360,70 390,80 Q420,90 440,110 Q460,130 450,150 Q440,170 420,170 Q400,170 380,160 Q360,150 340,130 Q320,110 300,100 Z" fill="#E6E6E6" stroke="#999999" stroke-width="1.5"/>
+  
+  <!-- Staten Island -->
+  <path d="M150,320 Q170,310 200,310 Q230,310 250,330 Q270,350 260,370 Q250,390 230,390 Q210,390 190,380 Q170,370 160,350 Z" fill="#E6E6E6" stroke="#999999" stroke-width="1.5"/>
+  
+  <!-- Transit lines -->
+  <path d="M250,150 Q270,190 270,230 Q270,270 250,300" stroke="#3B82F6" stroke-width="2" fill="none"/> <!-- Blue subway line -->
+  <path d="M300,150 Q320,190 350,230 Q380,270 420,300" stroke="#22C55E" stroke-width="2" fill="none"/> <!-- Green subway line -->
+  <path d="M200,250 Q240,240 280,250 Q320,260 360,280" stroke="#8B5CF6" stroke-width="2" fill="none"/> <!-- Purple subway line -->
+  <path d="M350,100 Q370,150 370,200 Q370,250 350,300" stroke="#F59E0B" stroke-width="2" fill="none"/> <!-- Orange subway line -->
+  
+  <!-- Key locations -->
+  <circle cx="270" cy="200" r="4" fill="#EF4444"/> <!-- Times Square -->
+  <circle cx="320" cy="250" r="4" fill="#EF4444"/> <!-- Downtown Brooklyn -->
+  <circle cx="380" cy="180" r="4" fill="#EF4444"/> <!-- Queens -->
+  <circle cx="340" cy="100" r="4" fill="#EF4444"/> <!-- Bronx -->
+  <circle cx="200" cy="340" r="4" fill="#EF4444"/> <!-- Staten Island -->
+  
+  <!-- Labels -->
+  <text x="260" y="160" font-family="Arial" font-size="10" fill="#333333">Manhattan</text>
+  <text x="350" y="300" font-family="Arial" font-size="10" fill="#333333">Brooklyn</text>
+  <text x="420" y="230" font-family="Arial" font-size="10" fill="#333333">Queens</text>
+  <text x="340" y="90" font-family="Arial" font-size="10" fill="#333333">Bronx</text>
+  <text x="190" y="350" font-family="Arial" font-size="10" fill="#333333">Staten Island</text>
+</svg> 

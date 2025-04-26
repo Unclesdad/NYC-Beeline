@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Body -->
+  <ellipse cx="12" cy="12" rx="8" ry="6" fill="#FFC107" stroke="#E0A800"/>
+  
+  <!-- Stripes -->
+  <path d="M10 8.5Q12 9 14 8.5" stroke="#000" stroke-width="1.5"/>
+  <path d="M9 11Q12 12 15 11" stroke="#000" stroke-width="1.5"/>
+  <path d="M10 13.5Q12 14.5 14 13.5" stroke="#000" stroke-width="1.5"/>
+  
+  <!-- Wings -->
+  <ellipse cx="8" cy="9" rx="4" ry="3" fill="#ECEFF1" stroke="#CFD8DC" transform="rotate(-30 8 9)"/>
+  <ellipse cx="16" cy="9" rx="4" ry="3" fill="#ECEFF1" stroke="#CFD8DC" transform="rotate(30 16 9)"/>
+  
+  <!-- Eyes -->
+  <circle cx="10" cy="10" r="1" fill="#000"/>
+  <circle cx="14" cy="10" r="1" fill="#000"/>
+  
+  <!-- Smile -->
+  <path d="M11 12Q12 13 13 12" stroke="#000" stroke-width="1"/>
+  
+  <!-- Stinger -->
+  <path d="M12 18L12 20" stroke="#000" stroke-width="1.5"/>
+  
+  <!-- Antenna -->
+  <path d="M10 8L9 6" stroke="#000" stroke-width="1"/>
+  <path d="M14 8L15 6" stroke="#000" stroke-width="1"/>
+  <circle cx="9" cy="6" r="0.5" fill="#000"/>
+  <circle cx="15" cy="6" r="0.5" fill="#000"/>
+</svg> 
