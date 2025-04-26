@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/router';
 import Image from 'next/image';
 import Layout from '@/components/Layout';
+import AnimatedBackground from '@/components/AnimatedBackground';
 
 export default function Home() {
   const router = useRouter();
@@ -22,19 +23,19 @@ export default function Home() {
 
   return (
     <Layout currentPage="home">
-      <div className="bg-gradient-to-br from-primary-50 to-secondary-50">
+      <AnimatedBackground theme="honey" intensity="medium">
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24">
           <div className="lg:grid lg:grid-cols-2 lg:gap-12 items-center">
             <div>
               <h2 className="text-4xl font-extrabold text-gray-900 sm:text-5xl sm:tracking-tight lg:text-6xl">
-                Find your optimal <span className="text-primary-600">path</span> across NYC
+                Find your optimal <span className="text-honey-600">path</span> across NYC
               </h2>
               <p className="mt-5 text-xl text-gray-500">
                 NYC Beeline uses real-time data to find the most efficient routes between boroughs, 
                 combining multiple transportation modes to save you time, money, and frustration.
               </p>
               
-              <div className="mt-8 rounded-lg bg-white shadow-lg p-6">
+              <div className="mt-8 rounded-lg bg-white shadow-lg p-6 backdrop-blur-sm bg-white/90">
                 <form onSubmit={handleSearch} className="space-y-4">
                   <div>
                     <label htmlFor="origin" className="block text-sm font-medium text-gray-700">
@@ -52,7 +53,7 @@ export default function Home() {
                         value={origin}
                         onChange={(e) => setOrigin(e.target.value)}
                         placeholder="Enter your starting location"
-                        className="pl-10 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                        className="pl-10 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-honey-500 focus:border-honey-500"
                         required
                       />
                     </div>
@@ -74,7 +75,7 @@ export default function Home() {
                         value={destination}
                         onChange={(e) => setDestination(e.target.value)}
                         placeholder="Enter your destination"
-                        className="pl-10 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                        className="pl-10 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-honey-500 focus:border-honey-500"
                         required
                       />
                     </div>
@@ -88,7 +89,7 @@ export default function Home() {
                         </label>
                         <div className="grid grid-cols-2 gap-2">
                           <div 
-                            className={`border rounded-md px-3 py-2 cursor-pointer text-center text-sm ${priority === 'speed' ? 'bg-primary-50 border-primary-500 text-primary-700' : 'border-gray-300 hover:bg-gray-50'}`}
+                            className={`border rounded-md px-3 py-2 cursor-pointer text-center text-sm ${priority === 'speed' ? 'bg-honey-50 border-honey-500 text-honey-700' : 'border-gray-300 hover:bg-gray-50'}`}
                             onClick={() => setPriority('speed')}
                           >
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mx-auto mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -97,7 +98,7 @@ export default function Home() {
                             Speed
                           </div>
                           <div 
-                            className={`border rounded-md px-3 py-2 cursor-pointer text-center text-sm ${priority === 'cost' ? 'bg-primary-50 border-primary-500 text-primary-700' : 'border-gray-300 hover:bg-gray-50'}`}
+                            className={`border rounded-md px-3 py-2 cursor-pointer text-center text-sm ${priority === 'cost' ? 'bg-honey-50 border-honey-500 text-honey-700' : 'border-gray-300 hover:bg-gray-50'}`}
                             onClick={() => setPriority('cost')}
                           >
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mx-auto mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -106,7 +107,7 @@ export default function Home() {
                             Cost
                           </div>
                           <div 
-                            className={`border rounded-md px-3 py-2 cursor-pointer text-center text-sm ${priority === 'comfort' ? 'bg-primary-50 border-primary-500 text-primary-700' : 'border-gray-300 hover:bg-gray-50'}`}
+                            className={`border rounded-md px-3 py-2 cursor-pointer text-center text-sm ${priority === 'comfort' ? 'bg-honey-50 border-honey-500 text-honey-700' : 'border-gray-300 hover:bg-gray-50'}`}
                             onClick={() => setPriority('comfort')}
                           >
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mx-auto mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -115,7 +116,7 @@ export default function Home() {
                             Comfort
                           </div>
                           <div 
-                            className={`border rounded-md px-3 py-2 cursor-pointer text-center text-sm ${priority === 'balanced' ? 'bg-primary-50 border-primary-500 text-primary-700' : 'border-gray-300 hover:bg-gray-50'}`}
+                            className={`border rounded-md px-3 py-2 cursor-pointer text-center text-sm ${priority === 'balanced' ? 'bg-honey-50 border-honey-500 text-honey-700' : 'border-gray-300 hover:bg-gray-50'}`}
                             onClick={() => setPriority('balanced')}
                           >
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mx-auto mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -134,7 +135,7 @@ export default function Home() {
                           <span className="text-xs text-gray-500">Low</span>
                           <div className="relative w-full mx-3">
                             <div className="h-1 bg-gray-200 rounded-full">
-                              <div className="absolute h-5 w-5 rounded-full bg-primary-500 -mt-2 transform -translate-x-1/2 cursor-pointer"
+                              <div className="absolute h-5 w-5 rounded-full bg-honey-500 -mt-2 transform -translate-x-1/2 cursor-pointer"
                                   style={{ left: noisePreference === 'low' ? '20%' : noisePreference === 'moderate' ? '50%' : '80%' }}
                                   onClick={() => {
                                     const nextPreference = noisePreference === 'low' ? 'moderate' : 
@@ -156,7 +157,7 @@ export default function Home() {
                           <span className="text-xs text-gray-500">Low</span>
                           <div className="relative w-full mx-3">
                             <div className="h-1 bg-gray-200 rounded-full">
-                              <div className="absolute h-5 w-5 rounded-full bg-primary-500 -mt-2 transform -translate-x-1/2 cursor-pointer"
+                              <div className="absolute h-5 w-5 rounded-full bg-honey-500 -mt-2 transform -translate-x-1/2 cursor-pointer"
                                   style={{ left: safetyPreference === 'low' ? '20%' : safetyPreference === 'moderate' ? '50%' : '80%' }}
                                   onClick={() => {
                                     const nextPreference = safetyPreference === 'low' ? 'moderate' : 
@@ -177,7 +178,7 @@ export default function Home() {
                         <div className="flex items-center">
                           <button 
                             type="button"
-                            className="bg-gray-100 h-8 w-8 rounded-full flex items-center justify-center border border-gray-300 text-gray-600"
+                            className="bg-gray-100 h-8 w-8 rounded-full flex items-center justify-center border border-gray-300 text-gray-600 hover:bg-honey-50 hover:border-honey-300"
                             onClick={() => setBagCount(Math.max(0, bagCount - 1))}
                           >
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -187,7 +188,7 @@ export default function Home() {
                           <div className="mx-4 font-medium w-8 text-center">{bagCount}</div>
                           <button 
                             type="button"
-                            className="bg-gray-100 h-8 w-8 rounded-full flex items-center justify-center border border-gray-300 text-gray-600"
+                            className="bg-gray-100 h-8 w-8 rounded-full flex items-center justify-center border border-gray-300 text-gray-600 hover:bg-honey-50 hover:border-honey-300"
                             onClick={() => setBagCount(Math.min(5, bagCount + 1))}
                           >
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -199,7 +200,7 @@ export default function Home() {
                       
                       <button
                         type="button"
-                        className="text-sm text-primary-600 hover:text-primary-500 font-medium"
+                        className="text-sm text-honey-600 hover:text-honey-500 font-medium"
                         onClick={() => setShowPreferences(false)}
                       >
                         Hide Preferences
@@ -208,7 +209,7 @@ export default function Home() {
                   ) : (
                     <button
                       type="button"
-                      className="text-sm text-primary-600 hover:text-primary-500 font-medium"
+                      className="text-sm text-honey-600 hover:text-honey-500 font-medium"
                       onClick={() => setShowPreferences(true)}
                     >
                       Show Travel Preferences
@@ -217,7 +218,7 @@ export default function Home() {
                   
                   <button
                     type="submit"
-                    className="w-full bg-primary-600 hover:bg-primary-700 text-white font-bold py-3 px-4 rounded-md transition duration-150 ease-in-out"
+                    className="w-full bg-honey-600 hover:bg-honey-700 text-white font-bold py-3 px-4 rounded-md transition duration-150 ease-in-out"
                   >
                     Find Routes
                   </button>
@@ -230,7 +231,7 @@ export default function Home() {
             </div>
             
             <div className="mt-12 lg:mt-0">
-              <div className="bg-white rounded-lg shadow-xl overflow-hidden">
+              <div className="bg-white/90 backdrop-blur-sm rounded-lg shadow-xl overflow-hidden">
                 <div className="h-72 w-full relative">
                   <Image
                     src="/images/nyc-map.svg"
@@ -249,8 +250,8 @@ export default function Home() {
               </div>
               
               <div className="grid grid-cols-2 gap-4 mt-4">
-                <div className="bg-white rounded-lg shadow-lg p-6">
-                  <div className="flex items-center justify-center h-12 w-12 rounded-md bg-primary-500 text-white mb-4">
+                <div className="bg-white/90 backdrop-blur-sm rounded-lg shadow-lg p-6">
+                  <div className="flex items-center justify-center h-12 w-12 rounded-md bg-honey-500 text-white mb-4">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
@@ -261,8 +262,8 @@ export default function Home() {
                   </p>
                 </div>
                 
-                <div className="bg-white rounded-lg shadow-lg p-6">
-                  <div className="flex items-center justify-center h-12 w-12 rounded-md bg-secondary-500 text-white mb-4">
+                <div className="bg-white/90 backdrop-blur-sm rounded-lg shadow-lg p-6">
+                  <div className="flex items-center justify-center h-12 w-12 rounded-md bg-honey-600 text-white mb-4">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
                     </svg>
@@ -277,7 +278,7 @@ export default function Home() {
           </div>
         </section>
         
-        <section className="bg-gray-50 py-12">
+        <section className="bg-white/70 backdrop-blur-sm py-12">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center">
               <h2 className="text-3xl font-extrabold text-gray-900">Why NYC Beeline?</h2>
@@ -287,7 +288,7 @@ export default function Home() {
             </div>
             
             <div className="mt-10 grid grid-cols-1 gap-8 md:grid-cols-3">
-              <div className="bg-white rounded-lg shadow-lg p-6">
+              <div className="bg-white/90 backdrop-blur-sm rounded-lg shadow-lg p-6 transition-transform hover:scale-105">
                 <div className="flex items-center justify-center h-12 w-12 rounded-md bg-success text-white mb-4">
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 01-.75.75h-.75m-6-1.5H4.5m0 0l6.75 1.5m0-1.5l-6.75-1.5" />
@@ -299,7 +300,7 @@ export default function Home() {
                 </p>
               </div>
               
-              <div className="bg-white rounded-lg shadow-lg p-6">
+              <div className="bg-white/90 backdrop-blur-sm rounded-lg shadow-lg p-6 transition-transform hover:scale-105">
                 <div className="flex items-center justify-center h-12 w-12 rounded-md bg-warning text-white mb-4">
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
@@ -311,7 +312,7 @@ export default function Home() {
                 </p>
               </div>
               
-              <div className="bg-white rounded-lg shadow-lg p-6">
+              <div className="bg-white/90 backdrop-blur-sm rounded-lg shadow-lg p-6 transition-transform hover:scale-105">
                 <div className="flex items-center justify-center h-12 w-12 rounded-md bg-info text-white mb-4">
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -326,7 +327,7 @@ export default function Home() {
             </div>
           </div>
         </section>
-      </div>
+      </AnimatedBackground>
     </Layout>
   );
 } 
