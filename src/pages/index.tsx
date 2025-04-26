@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Image from 'next/image';
 import Layout from '@/components/Layout';
 import AnimatedBackground from '@/components/AnimatedBackground';
+import axios from 'axios';
 
 // Custom styles for range sliders across browsers
 const sliderStyles = `
@@ -113,7 +114,7 @@ export default function Home() {
   const router = useRouter();
   const [origin, setOrigin] = useState('');
   const [destination, setDestination] = useState('');
-  const [showPreferences, setShowPreferences] = useState(false);
+  const [showPreferences, setShowPreferences] = useState(true);
   const [priority, setPriority] = useState('balanced');
   const [noisePreference, setNoisePreference] = useState('moderate');
   const [safetyPreference, setSafetyPreference] = useState('moderate');
@@ -121,6 +122,77 @@ export default function Home() {
   const [safetyValue, setSafetyValue] = useState(50);
   const [bagCount, setBagCount] = useState(0);
   const [wheelchairAccessible, setWheelchairAccessible] = useState(false);
+  const [elevationPreference, setElevationPreference] = useState('moderate');
+  
+  // New state for address suggestions
+  const [originSuggestions, setOriginSuggestions] = useState<string[]>([]);
+  const [destinationSuggestions, setDestinationSuggestions] = useState<string[]>([]);
+  const [showOriginSuggestions, setShowOriginSuggestions] = useState(false);
+  const [showDestinationSuggestions, setShowDestinationSuggestions] = useState(false);
+  
+  // Refs for handling outside clicks
+  const originInputRef = useRef<HTMLDivElement>(null);
+  const destinationInputRef = useRef<HTMLDivElement>(null);
+  
+  // Fetch address suggestions
+  const fetchAddressSuggestions = async (input: string, type: 'origin' | 'destination') => {
+    if (input.length < 2) {
+      type === 'origin' ? setOriginSuggestions([]) : setDestinationSuggestions([]);
+      return;
+    }
+    
+    try {
+      const response = await axios.get(`/api/address-suggestions?query=${encodeURIComponent(input)}`);
+      if (response.data && response.data.suggestions) {
+        type === 'origin' ? setOriginSuggestions(response.data.suggestions) : setDestinationSuggestions(response.data.suggestions);
+      }
+    } catch (error) {
+      console.error('Failed to fetch address suggestions:', error);
+    }
+  };
+  
+  // Handle input changes
+  const handleOriginChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setOrigin(value);
+    fetchAddressSuggestions(value, 'origin');
+    setShowOriginSuggestions(true);
+  };
+  
+  const handleDestinationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setDestination(value);
+    fetchAddressSuggestions(value, 'destination');
+    setShowDestinationSuggestions(true);
+  };
+  
+  // Handle suggestion selection
+  const handleSuggestionSelect = (suggestion: string, type: 'origin' | 'destination') => {
+    if (type === 'origin') {
+      setOrigin(suggestion);
+      setShowOriginSuggestions(false);
+    } else {
+      setDestination(suggestion);
+      setShowDestinationSuggestions(false);
+    }
+  };
+  
+  // Close suggestion dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (originInputRef.current && !originInputRef.current.contains(event.target as Node)) {
+        setShowOriginSuggestions(false);
+      }
+      if (destinationInputRef.current && !destinationInputRef.current.contains(event.target as Node)) {
+        setShowDestinationSuggestions(false);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   // Update string preferences when slider values change
   useEffect(() => {
@@ -146,7 +218,7 @@ export default function Home() {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (origin && destination) {
-      router.push(`/routes?from=${encodeURIComponent(origin)}&to=${encodeURIComponent(destination)}&priority=${priority}&noise=${noisePreference}&safety=${safetyPreference}&bags=${bagCount}&wheelchair=${wheelchairAccessible}`);
+      router.push(`/route-planner?from=${encodeURIComponent(origin)}&to=${encodeURIComponent(destination)}&priority=${priority}&noise=${noisePreference}&safety=${safetyPreference}&bags=${bagCount}&wheelchair=${wheelchairAccessible}&elevation=${elevationPreference}`);
     }
   };
 
@@ -171,7 +243,7 @@ export default function Home() {
                     <label htmlFor="origin" className="block text-sm font-medium text-gray-700">
                       Starting Point
                     </label>
-                    <div className="mt-1 relative rounded-md shadow-sm">
+                    <div ref={originInputRef} className="mt-1 relative rounded-md shadow-sm">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
                           <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
@@ -181,11 +253,25 @@ export default function Home() {
                         type="text"
                         id="origin"
                         value={origin}
-                        onChange={(e) => setOrigin(e.target.value)}
+                        onChange={handleOriginChange}
+                        onFocus={() => setShowOriginSuggestions(true)}
                         placeholder="Enter your starting location"
                         className="pl-10 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-honey-500 focus:border-honey-500"
                         required
                       />
+                      {showOriginSuggestions && originSuggestions.length > 0 && (
+                        <div className="absolute z-10 mt-1 w-full bg-white shadow-lg max-h-60 rounded-md py-1 text-base overflow-auto focus:outline-none sm:text-sm">
+                          {originSuggestions.map((suggestion, index) => (
+                            <div
+                              key={index}
+                              className="cursor-pointer select-none relative py-2 pl-3 pr-9 hover:bg-gray-100"
+                              onClick={() => handleSuggestionSelect(suggestion, 'origin')}
+                            >
+                              <span className="block truncate">{suggestion}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                   
@@ -193,7 +279,7 @@ export default function Home() {
                     <label htmlFor="destination" className="block text-sm font-medium text-gray-700">
                       Destination
                     </label>
-                    <div className="mt-1 relative rounded-md shadow-sm">
+                    <div ref={destinationInputRef} className="mt-1 relative rounded-md shadow-sm">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
                           <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
@@ -203,11 +289,25 @@ export default function Home() {
                         type="text"
                         id="destination"
                         value={destination}
-                        onChange={(e) => setDestination(e.target.value)}
+                        onChange={handleDestinationChange}
+                        onFocus={() => setShowDestinationSuggestions(true)}
                         placeholder="Enter your destination"
                         className="pl-10 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-honey-500 focus:border-honey-500"
                         required
                       />
+                      {showDestinationSuggestions && destinationSuggestions.length > 0 && (
+                        <div className="absolute z-10 mt-1 w-full bg-white shadow-lg max-h-60 rounded-md py-1 text-base overflow-auto focus:outline-none sm:text-sm">
+                          {destinationSuggestions.map((suggestion, index) => (
+                            <div
+                              key={index}
+                              className="cursor-pointer select-none relative py-2 pl-3 pr-9 hover:bg-gray-100"
+                              onClick={() => handleSuggestionSelect(suggestion, 'destination')}
+                            >
+                              <span className="block truncate">{suggestion}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                   

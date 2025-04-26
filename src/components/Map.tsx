@@ -796,41 +796,37 @@ const Map = ({ origin, destination, segments }: MapProps) => {
   
   // Get coordinates from location string or use mock data
   const getCoordinates = (location: string): Coordinates => {
-    // Normalize the location string for better matching
+    if (!location) {
+      console.warn("Location is undefined or null");
+      return mockCoordinates['Times Square']; // Return a default location like Times Square
+    }
+
+    // Normalize the location string
     const normalizedLocation = location.toLowerCase();
-    
-    // Try to find in our mock data - first with exact matches
-    for (const [name, coords] of Object.entries(mockCoordinates)) {
-      if (normalizedLocation.includes(name.toLowerCase())) {
+
+    // Try to match with known locations first
+    for (const [locationName, coords] of Object.entries(mockCoordinates)) {
+      if (normalizedLocation.includes(locationName.toLowerCase())) {
         return coords;
       }
     }
-    
-    // If no specific match, try to determine which borough it's in
-    if (normalizedLocation.includes('queens') || 
-        normalizedLocation.includes('flushing') || 
-        normalizedLocation.includes('bayside') ||
-        normalizedLocation.includes('jamaica') ||
-        normalizedLocation.includes('astoria')) {
-      return mockCoordinates['Queens'];
+
+    // Check for specific NYC neighborhoods
+    if (normalizedLocation.includes('manhattan')) {
+      return mockCoordinates.Manhattan;
+    } else if (normalizedLocation.includes('brooklyn')) {
+      return mockCoordinates.Brooklyn;
+    } else if (normalizedLocation.includes('queens')) {
+      return mockCoordinates.Queens;
+    } else if (normalizedLocation.includes('bronx')) {
+      return mockCoordinates.Bronx;
+    } else if (normalizedLocation.includes('staten island')) {
+      return mockCoordinates.StatenIsland;
     }
-    
-    if (normalizedLocation.includes('brooklyn') ||
-        normalizedLocation.includes('williamsburg') ||
-        normalizedLocation.includes('park slope')) {
-      return mockCoordinates['Brooklyn'];
-    }
-    
-    if (normalizedLocation.includes('bronx')) {
-      return mockCoordinates['Bronx'];
-    }
-    
-    if (normalizedLocation.includes('staten')) {
-      return mockCoordinates['Staten Island'];
-    }
-    
-    // Default to Manhattan if not found
-    return mockCoordinates['Manhattan'];
+
+    // If still not found, generate a random location near the center of NYC
+    console.warn("Location not found, using a generated coordinate:", location);
+    return generateRandomNYCLocation();
   };
   
   useEffect(() => {

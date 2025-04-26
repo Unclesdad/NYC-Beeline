@@ -123,6 +123,36 @@ const getRouteColor = (mode: string) => {
   }
 };
 
+// Define the route type
+interface RouteItem {
+  id: string;
+  name: string;
+  duration: number;
+  cost: number;
+  comfort: string;
+  vectorScore: number;
+  segments: any[];
+  balancedScore?: {
+    raw: number;
+    score: number;
+    timeScore: number;
+    costScore: number;
+    comfortScore: number;
+    transferScore: number;
+  };
+  // Additional properties
+  hasTopologyImpact?: boolean;
+  numTransfers?: number;
+  traffic?: { level: string; impact: number };
+  eta?: string;
+  co2?: number;
+  isWheelchairAccessible?: boolean;
+  scores?: any;
+  routeColor?: string;
+  pathData?: any[];
+  costBreakdown?: any;
+}
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -297,7 +327,7 @@ export default async function handler(
     
     // Routes generation logic
     const generateRoutes = () => {
-      const routes = [];
+      const routes: RouteItem[] = [];
       
       // Calculate a balanced score to determine which route should be "Best Overall"
       const calculateBalancedScore = (duration: number, cost: number, comfort: string, numTransfers: number, hasBags: boolean, isHilly: boolean, trafficImpact: number, isWheelchairAccessible: boolean) => {
@@ -325,28 +355,28 @@ export default async function handler(
         const transferScore = Math.max(0, 1 - (numTransfers * 0.15));
         
         // Adjust weights based on user priority
-        let timeWeight = 0.35;
-        let costWeight = 0.25;
-        let comfortWeight = 0.25;
-        let transferWeight = 0.15;
+        let timeWeight = 0.40;
+        let costWeight = 0.35;
+        let comfortWeight = 0.15;
+        let transferWeight = 0.10;
         
         switch (userPriority) {
           case 'speed':
-            timeWeight = 0.5;
-            costWeight = 0.15;
-            comfortWeight = 0.2;
-            transferWeight = 0.15;
+            timeWeight = 0.60;
+            costWeight = 0.20;
+            comfortWeight = 0.10;
+            transferWeight = 0.10;
             break;
           case 'cost':
-            timeWeight = 0.2;
-            costWeight = 0.5;
-            comfortWeight = 0.15;
-            transferWeight = 0.15;
+            timeWeight = 0.20;
+            costWeight = 0.60;
+            comfortWeight = 0.10;
+            transferWeight = 0.10;
             break;
           case 'comfort':
-            timeWeight = 0.2;
-            costWeight = 0.15;
-            comfortWeight = 0.5;
+            timeWeight = 0.20;
+            costWeight = 0.20;
+            comfortWeight = 0.45;
             transferWeight = 0.15;
             break;
           default: // 'balanced'
@@ -413,14 +443,14 @@ export default async function handler(
       };
       
       // 0. Best Overall route
-      const bestOverallRoute = {
+      const bestOverallRoute: RouteItem = {
         id: '0',
         name: 'Best Overall Route',
         duration: 0,
         cost: 0,
         comfort: 'medium' as 'high' | 'medium' | 'low',
         vectorScore: 0.95,
-        segments: [] as any[],
+        segments: [],
         // Additional detailed information
         hasTopologyImpact: false,
         numTransfers: 0,
@@ -479,22 +509,22 @@ export default async function handler(
             case 'bus':
               // Bus routes should follow a more zigzag street-like pattern
               const numPoints = Math.ceil(calculateDistance(lastCoords[0], lastCoords[1], endCoords[0], endCoords[1]) * 2);
-              const points = [lastCoords];
+              const points: [number, number][] = [lastCoords];
               
               // Generate points that zigzag like city streets
-              let currentPoint = [...lastCoords];
+              let currentPoint: [number, number] = [...lastCoords] as [number, number];
               for (let i = 0; i < numPoints; i++) {
                 // Alternate between horizontal and vertical movement
                 if (i % 2 === 0) {
                   currentPoint = [
                     currentPoint[0],
                     currentPoint[1] + (endCoords[1] - currentPoint[1]) * 0.3
-                  ];
+                  ] as [number, number];
                 } else {
                   currentPoint = [
                     currentPoint[0] + (endCoords[0] - currentPoint[0]) * 0.3,
                     currentPoint[1]
-                  ];
+                  ] as [number, number];
                 }
                 points.push(currentPoint);
               }
@@ -844,7 +874,7 @@ export default async function handler(
       
       // 1. If subway is available, create a subway route
       if (bestSubwayLine || hasTransferOptions) {
-        const subwayRoute = {
+        const subwayRoute: RouteItem = {
           id: routes.length + '',
           name: 'Fastest Route',
           duration: Math.round(distance * 10),
@@ -912,7 +942,7 @@ export default async function handler(
       }
       
       // 2. Always create a ride-sharing route as an option
-      const uberRoute = {
+      const uberRoute: RouteItem = {
         id: routes.length + '',
         name: 'Most Comfortable Route',
         duration: Math.round(distance * 12),
@@ -947,11 +977,79 @@ export default async function handler(
         ],
       };
       routes.push(uberRoute);
+
+      // Add a taxi route option
+      const taxiRoute: RouteItem = {
+        id: routes.length + '',
+        name: 'Taxi Route',
+        duration: Math.round(distance * 11),
+        cost: parseFloat((distance * 2.8).toFixed(2)),
+        comfort: 'high',
+        vectorScore: 0.77,
+        segments: [
+          {
+            mode: 'walk',
+            startLocation: from as string,
+            endLocation: `Taxi Stand near ${from}`,
+            duration: 4,
+            cost: 0,
+            lineInfo: 'Walk to taxi stand',
+          },
+          {
+            mode: 'taxi',
+            startLocation: `Taxi Stand near ${from}`,
+            endLocation: to as string,
+            duration: Math.round(distance * 9),
+            cost: parseFloat((distance * 2.8).toFixed(2)),
+            lineInfo: 'NYC Taxi',
+          }
+        ],
+      };
+      routes.push(taxiRoute);
+
+      // Add an E-bike route option if the distance is under 10 miles
+      if (distance < 10) {
+        const ebikeRoute: RouteItem = {
+          id: routes.length + '',
+          name: 'E-Bike Route',
+          duration: Math.round(distance * 15),
+          cost: 5.00,
+          comfort: 'medium',
+          vectorScore: 0.72,
+          segments: [
+            {
+              mode: 'walk',
+              startLocation: from as string,
+              endLocation: `E-Bike Station near ${from}`,
+              duration: 5,
+              cost: 0,
+              lineInfo: 'Walk to e-bike station',
+            },
+            {
+              mode: 'ebike',
+              startLocation: `E-Bike Station near ${from}`,
+              endLocation: `E-Bike Station near ${to}`,
+              duration: Math.round(distance * 12),
+              cost: 5.00,
+              lineInfo: 'Citi Bike E-Bike',
+            },
+            {
+              mode: 'walk',
+              startLocation: `E-Bike Station near ${to}`,
+              endLocation: to as string,
+              duration: 5,
+              cost: 0,
+              lineInfo: 'Walk to destination',
+            },
+          ],
+        };
+        routes.push(ebikeRoute);
+      }
       
       // 3. Try to create a bus route if available
       if (busRoutesFrom.length > 0) {
         // Use the connecting bus or an area-specific bus route
-        const busOption = {
+        const busOption: RouteItem = {
           id: routes.length + '',
           name: 'Cheapest Route',
           duration: Math.round(distance * 15),
@@ -1041,7 +1139,7 @@ export default async function handler(
         routes.push(busOption);
       } else if (!bestSubwayLine && !hasTransferOptions) {
         // 4. If no subway or bus is available, add a bike option
-        const bikeOption = {
+        const bikeOption: RouteItem = {
           id: routes.length + '',
           name: 'Eco-Friendly Route',
           duration: Math.round(distance * 18),
@@ -1083,124 +1181,127 @@ export default async function handler(
         route.balancedScore = calculateBalancedScore(route.duration, route.cost, route.comfort, 0, false, false, 1, true);
       });
       
-      return routes.map(finalizeRoute);
+      const mockRoutes = routes.map(finalizeRoute);
+      
+      // Always ensure we have at least 3 routes
+      if (mockRoutes.length < 3) {
+        // Generate more diverse route options if needed
+        if (mockRoutes.length === 1) {
+          // Add a slower but cheaper option
+          const cheapestRoute: RouteItem = {
+            id: '98',
+            name: 'Economy Option',
+            duration: Math.round(distance * 18),
+            cost: 2.75,
+            comfort: 'low',
+            vectorScore: 0.65,
+            segments: [
+              {
+                mode: 'walk',
+                startLocation: from as string,
+                endLocation: `Bus Stop near ${from}`,
+                duration: 10,
+                cost: 0,
+                lineInfo: 'Walk to bus stop',
+              },
+              {
+                mode: 'bus',
+                startLocation: `Bus Stop near ${from}`,
+                endLocation: `Bus Stop near ${to}`,
+                duration: Math.round(distance * 14),
+                cost: 2.75,
+                lineInfo: `Local Bus Route`,
+              },
+              {
+                mode: 'walk',
+                startLocation: `Bus Stop near ${to}`,
+                endLocation: to as string,
+                duration: 10,
+                cost: 0,
+                lineInfo: 'Walk to destination',
+              },
+            ],
+          };
+          mockRoutes.push(finalizeRoute(cheapestRoute));
+          
+          // Add a faster but expensive option
+          const fastestRoute: RouteItem = {
+            id: '99',
+            name: 'Premium Express',
+            duration: Math.round(distance * 8),
+            cost: parseFloat((distance * 2.5).toFixed(2)),
+            comfort: 'high',
+            vectorScore: 0.75,
+            segments: [
+              {
+                mode: 'walk',
+                startLocation: from as string,
+                endLocation: `Pickup near ${from}`,
+                duration: 3,
+                cost: 0,
+                lineInfo: 'Walk to pickup point',
+              },
+              {
+                mode: 'uber',
+                startLocation: `Pickup near ${from}`,
+                endLocation: to as string,
+                duration: Math.round(distance * 7),
+                cost: parseFloat((distance * 2.5).toFixed(2)),
+                lineInfo: 'UberX Direct',
+              },
+            ],
+          };
+          mockRoutes.push(finalizeRoute(fastestRoute));
+        }
+      }
+      
+      // Filter routes based on wheelchair accessibility if required
+      let filteredRoutes = mockRoutes;
+      if (requireWheelchair) {
+        filteredRoutes = mockRoutes.filter(route => route.isWheelchairAccessible);
+        
+        // If no accessible routes are found, generate at least one
+        if (filteredRoutes.length === 0) {
+          const accessibleRoute: RouteItem = {
+            id: '99',
+            name: 'Wheelchair Accessible Route',
+            duration: Math.round(distance * 10),
+            cost: parseFloat((distance * 2.8).toFixed(2)), // Slightly more expensive for accessible vehicles
+            comfort: 'high',
+            vectorScore: 0.7,
+            segments: [
+              {
+                mode: 'walk',
+                startLocation: from as string,
+                endLocation: `Accessible Pickup near ${from}`,
+                duration: 5,
+                cost: 0,
+                lineInfo: 'Short accessible walk to pickup',
+                wheelchairAccessible: true
+              },
+              {
+                mode: 'taxi',
+                startLocation: `Pickup near ${from}`,
+                endLocation: to as string,
+                duration: Math.round(distance * 9),
+                cost: parseFloat((distance * 2.8).toFixed(2)),
+                lineInfo: 'Wheelchair accessible taxi',
+                wheelchairAccessible: true
+              }
+            ],
+            isWheelchairAccessible: true
+          };
+          filteredRoutes.push(finalizeRoute(accessibleRoute));
+        }
+      }
+      
+      return filteredRoutes;
     };
     
-    const mockRoutes = generateRoutes();
-
-    // Always ensure we have at least 3 routes
-    if (mockRoutes.length < 3) {
-      // Generate more diverse route options if needed
-      if (mockRoutes.length === 1) {
-        // Add a slower but cheaper option
-        const cheapestRoute = {
-          id: '98',
-          name: 'Economy Option',
-          duration: Math.round(distance * 18),
-          cost: 2.75,
-          comfort: 'low',
-          vectorScore: 0.65,
-          segments: [
-            {
-              mode: 'walk',
-              startLocation: from as string,
-              endLocation: `Bus Stop near ${from}`,
-              duration: 10,
-              cost: 0,
-              lineInfo: 'Walk to bus stop',
-            },
-            {
-              mode: 'bus',
-              startLocation: `Bus Stop near ${from}`,
-              endLocation: `Bus Stop near ${to}`,
-              duration: Math.round(distance * 14),
-              cost: 2.75,
-              lineInfo: `Local Bus Route`,
-            },
-            {
-              mode: 'walk',
-              startLocation: `Bus Stop near ${to}`,
-              endLocation: to as string,
-              duration: 10,
-              cost: 0,
-              lineInfo: 'Walk to destination',
-            },
-          ],
-        };
-        mockRoutes.push(finalizeRoute(cheapestRoute));
-        
-        // Add a faster but expensive option
-        const fastestRoute = {
-          id: '99',
-          name: 'Premium Express',
-          duration: Math.round(distance * 8),
-          cost: parseFloat((distance * 2.5).toFixed(2)),
-          comfort: 'high',
-          vectorScore: 0.75,
-          segments: [
-            {
-              mode: 'walk',
-              startLocation: from as string,
-              endLocation: `Pickup near ${from}`,
-              duration: 3,
-              cost: 0,
-              lineInfo: 'Walk to pickup point',
-            },
-            {
-              mode: 'uber',
-              startLocation: `Pickup near ${from}`,
-              endLocation: to as string,
-              duration: Math.round(distance * 7),
-              cost: parseFloat((distance * 2.5).toFixed(2)),
-              lineInfo: 'UberX Direct',
-            },
-          ],
-        };
-        mockRoutes.push(finalizeRoute(fastestRoute));
-      }
-    }
-
-    // Filter routes based on wheelchair accessibility if required
-    if (requireWheelchair) {
-      mockRoutes = mockRoutes.filter(route => route.isWheelchairAccessible);
-      
-      // If no accessible routes are found, generate at least one
-      if (mockRoutes.length === 0) {
-        const accessibleRoute = {
-          id: '99',
-          name: 'Wheelchair Accessible Route',
-          duration: Math.round(distance * 10),
-          cost: parseFloat((distance * 2.8).toFixed(2)), // Slightly more expensive for accessible vehicles
-          comfort: 'high',
-          vectorScore: 0.7,
-          segments: [
-            {
-              mode: 'walk',
-              startLocation: from as string,
-              endLocation: `Accessible Pickup near ${from}`,
-              duration: 5,
-              cost: 0,
-              lineInfo: 'Short accessible walk to pickup',
-              wheelchairAccessible: true
-            },
-            {
-              mode: 'taxi',
-              startLocation: `Pickup near ${from}`,
-              endLocation: to as string,
-              duration: Math.round(distance * 9),
-              cost: parseFloat((distance * 2.8).toFixed(2)),
-              lineInfo: 'Wheelchair accessible taxi',
-              wheelchairAccessible: true
-            }
-          ],
-          isWheelchairAccessible: true
-        };
-        mockRoutes.push(finalizeRoute(accessibleRoute));
-      }
-    }
+    const routes = generateRoutes();
 
     return res.status(200).json({ 
-      routes: mockRoutes,
+      routes: routes,
       distance,
       fromCoords,
       toCoords,

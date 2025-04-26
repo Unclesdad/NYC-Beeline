@@ -84,8 +84,11 @@ const AnimatedBackground: React.FC<AnimatedBackgroundProps> = ({
       opacity: number;
       
       constructor() {
-        this.x = Math.random() * canvas.width;
-        this.y = Math.random() * canvas.height;
+        const canvasWidth = canvas ? canvas.width : window.innerWidth;
+        const canvasHeight = canvas ? canvas.height : window.innerHeight;
+        
+        this.x = Math.random() * canvasWidth;
+        this.y = Math.random() * canvasHeight;
         this.baseSize = Math.random() * 5 + 2;
         this.size = this.baseSize;
         this.speedX = Math.random() * 1 - 0.5;
@@ -97,6 +100,8 @@ const AnimatedBackground: React.FC<AnimatedBackgroundProps> = ({
       }
       
       update() {
+        if (!canvas) return;
+        
         this.x += this.speedX;
         this.y += this.speedY;
         
@@ -144,6 +149,8 @@ const AnimatedBackground: React.FC<AnimatedBackgroundProps> = ({
     
     // Animate
     const animate = () => {
+      if (!canvas || !ctx) return;
+      
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       
       // Draw background patterns based on selected pattern
