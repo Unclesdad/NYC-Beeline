@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { transitAPI } from '@/lib/api';
 import { transportModes, findOptimalRoutes } from '@/utils/vectorCalculation';
+import { subwayRoutes, busRoutes, findClosestPointOnRoute, getRouteSegment, mtaRoutes } from '@/data/mta-routes';
 
 // Mock coordinates for some NYC locations
 const locationCoordinates: Record<string, [number, number]> = {
@@ -141,6 +142,11 @@ const calculateCO2Emissions = (mode: string, distanceKm: number): number => {
     'shared': 90,     // Shared ride (per passenger)
     'default': 100    // Default value
   };
+
+  // If mode is walking or biking, return 0 regardless of distance
+  if (mode === 'walk' || mode === 'bike') {
+    return 0;
+  }
 
   const emissionFactor = emissionsFactors[mode] || emissionsFactors.default;
   return Math.round(emissionFactor * distanceKm);
@@ -351,1048 +357,321 @@ export default async function handler(
     const generateRoutes = () => {
       const routes: RouteItem[] = [];
       
-      // Calculate a balanced score to determine which route should be "Best Overall"
-      const calculateBalancedScore = (duration: number, cost: number, comfort: string, numTransfers: number, hasBags: boolean, isHilly: boolean, trafficImpact: number, isWheelchairAccessible: boolean) => {
-        // Base comfort score from comfort level
-        let comfortScore = comfort === 'high' ? 0.9 : comfort === 'medium' ? 0.6 : 0.3;
-        
-        // Adjust comfort for number of bags
-        if (userBags > 0) {
-          // Each bag reduces comfort, especially for walking/biking
-          comfortScore = Math.max(0.1, comfortScore - (userBags * 0.1));
-        }
-        
-        // Adjust comfort for topology if route involves walking or biking
-        if (isHilly) {
-          comfortScore = Math.max(0.1, comfortScore - avgTopologyDifficulty);
-        }
-        
-        // Normalize time and cost on a scale where lower is better
-        // Traffic factor increases duration for road-based transport
-        const adjustedDuration = duration * trafficImpact;
-        const timeScore = Math.max(0, 1 - (adjustedDuration / 120)); // Assume 120 mins is worst case
-        const costScore = Math.max(0, 1 - (cost / 30));      // Assume $30 is worst case
-        
-        // Transfer penalty
-        const transferScore = Math.max(0, 1 - (numTransfers * 0.15));
-        
-        // Adjust weights based on user priority
-        let timeWeight = 0.85;  // Dramatically increased base time weight (was 0.70)
-        let costWeight = 0.08;  // Reduced (was 0.15)
-        let comfortWeight = 0.05;  // Reduced (was 0.10)
-        let transferWeight = 0.02;  // Reduced (was 0.05)
-        
-        switch (userPriority) {
-          case 'speed':
-            timeWeight = 0.90;    // Even more emphasis on time (was 0.85)
-            costWeight = 0.05;    // Further reduced (was 0.08)
-            comfortWeight = 0.03;  // Further reduced (was 0.04)
-            transferWeight = 0.02; // Further reduced (was 0.03)
-            break;
-          case 'cost':
-            timeWeight = 0.75;    // Still very high time priority (was 0.60)
-            costWeight = 0.15;    // Reduced (was 0.25)
-            comfortWeight = 0.07;  // Reduced (was 0.10)
-            transferWeight = 0.03; // Reduced (was 0.05)
-            break;
-          case 'comfort':
-            timeWeight = 0.75;    // Still very high time priority (was 0.60)
-            costWeight = 0.10;    // Reduced (was 0.15)
-            comfortWeight = 0.12;  // Reduced (was 0.20)
-            transferWeight = 0.03; // Reduced (was 0.05)
-            break;
-          default: // 'balanced'
-            // Keep the default weights defined above
-            break;
-        }
-        
-        // Further adjust comfort weight based on noise sensitivity
-        if (userNoise === 'high') {
-          // Minimal comfort weight adjustment to maintain time priority
-          comfortWeight += 0.03;  // Reduced adjustment (was 0.05)
-          // And reduce other weights proportionally, taking more from cost than time
-          timeWeight -= 0.01;    // Reduced reduction (was 0.02)
-          costWeight -= 0.01;    // Reduced reduction (was 0.02)
-          transferWeight -= 0.01; // Same as before
-        }
-        
-        // Adjust for safety preference
-        if (userSafety === 'high') {
-          // Minimal adjustments to maintain time priority
-          transferWeight += 0.02;  // Reduced adjustment (was 0.03)
-          comfortWeight += 0.01;   // Reduced adjustment (was 0.02)
-          timeWeight -= 0.01;      // Reduced reduction (was 0.02)
-          costWeight -= 0.02;      // Reduced reduction (was 0.03)
-        }
-        
-        // Add wheelchair accessibility factor if needed
-        let accessibilityPenalty = 0;
-        if (requireWheelchair && !isWheelchairAccessible) {
-          // Significantly penalize non-accessible routes when wheelchair is required
-          accessibilityPenalty = 0.5;
-        }
-        
-        const rawScore = ((timeScore * timeWeight) + 
-                          (costScore * costWeight) + 
-                          (comfortScore * comfortWeight) + 
-                          (transferScore * transferWeight)) * 
-                          (1 - accessibilityPenalty);
-        
-        // Convert to 1-10 scale
+      // Helper function to calculate balanced score
+      const calculateBalancedScore = (
+        duration: number, 
+        cost: number, 
+        comfort: string, 
+        numTransfers: number
+      ) => {
+        // Simple scoring system
+        const timeScore = Math.max(0, 1 - (duration / 120)); // Normalize to 0-1 (2 hours max)
+        const costScore = Math.max(0, 1 - (cost / 30));      // Normalize to 0-1 ($30 max)
+        const comfortScore = comfort === 'high' ? 1 : comfort === 'medium' ? 0.6 : 0.3;
+        const transferScore = Math.max(0, 1 - (numTransfers * 0.2));
+
+        // Weighted average
+        const score = (
+          timeScore * 0.4 +
+          costScore * 0.3 +
+          comfortScore * 0.2 +
+          transferScore * 0.1
+        );
+
         return {
-          raw: rawScore,
-          score: Math.round(rawScore * 10),
+          raw: score,
+          score: Math.round(score * 10),
           timeScore: Math.round(timeScore * 10),
           costScore: Math.round(costScore * 10),
           comfortScore: Math.round(comfortScore * 10),
           transferScore: Math.round(transferScore * 10)
         };
       };
-      
-      // Function to generate route color based on score
-      const getRouteColorFromScore = (score: number) => {
-        // Color gradient from red (1) to yellow (5) to green (10)
-        if (score <= 3) return '#ef4444'; // red-500
-        if (score <= 5) return '#f59e0b'; // amber-500
-        if (score <= 7) return '#facc15'; // yellow-400
-        if (score <= 9) return '#65a30d'; // lime-600
-        return '#16a34a'; // green-600
-      };
-      
-      // Reference the outer getRouteColor function or redefine it here
-      const getRouteColorForMode = (mode: string) => {
-        return getRouteColor(mode);
-      };
-      
-      // 0. Best Overall route
-      const bestOverallRoute: RouteItem = {
+
+      // Always add a walking route as a baseline option
+      const walkingRoute: RouteItem = {
         id: '0',
-        name: 'Best Overall Route',
-        duration: 0,
+        name: 'Walking Route',
+        duration: Math.round(distance * 20),
         cost: 0,
-        comfort: 'medium' as 'high' | 'medium' | 'low',
-        vectorScore: 0.95,
-        segments: [],
-        // Additional detailed information
-        hasTopologyImpact: false,
-        numTransfers: 0,
-        traffic: { level: 'medium', impact: 1.0 },
-        eta: '',
-        costBreakdown: { 
-          fare: 0, 
-          additionalFees: 0,
-          totalCost: 0 
-        },
-        scores: {
-          overall: 0,
-          time: 0,
-          cost: 0,
-          comfort: 0,
-          transfers: 0
-        },
-        routeColor: '',
-        pathData: []
-      };
-      
-      // Helper to calculate ETA
-      const calculateETA = (durationMinutes: number) => {
-        const now = new Date();
-        const eta = new Date(now.getTime() + durationMinutes * 60000);
-        return eta.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      };
-      
-      // Generate path data for map visualization
-      const generatePathData = (route: any) => {
-        const pathData: any[] = [];
-        
-        let lastCoords = fromCoords;
-        route.segments.forEach((segment: any, index: number) => {
-          const isLastSegment = index === route.segments.length - 1;
-          const endCoords = isLastSegment ? toCoords : getCoordinates(segment.endLocation);
-          
-          // For different transport modes, generate different path types
-          switch(segment.mode) {
-            case 'subway':
-              // Subway routes should follow mostly straight lines with slight curves
-              pathData.push({
-                type: 'subway',
-                color: getRouteColorForMode(segment.mode),
-                points: [
-                  lastCoords,
-                  // Add a midpoint with slight offset for a natural curve
-                  [
-                    lastCoords[0] + (endCoords[0] - lastCoords[0]) * 0.5 + (Math.random() - 0.5) * 0.01,
-                    lastCoords[1] + (endCoords[1] - lastCoords[1]) * 0.5 + (Math.random() - 0.5) * 0.01
-                  ],
-                  endCoords
-                ]
-              });
-              break;
-            case 'bus':
-              // Bus routes should follow a more zigzag street-like pattern
-              const numPoints = Math.ceil(calculateDistance(lastCoords[0], lastCoords[1], endCoords[0], endCoords[1]) * 2);
-              const points: [number, number][] = [lastCoords];
-              
-              // Generate points that zigzag like city streets
-              let currentPoint: [number, number] = [...lastCoords] as [number, number];
-              for (let i = 0; i < numPoints; i++) {
-                // Alternate between horizontal and vertical movement
-                if (i % 2 === 0) {
-                  currentPoint = [
-                    currentPoint[0],
-                    currentPoint[1] + (endCoords[1] - currentPoint[1]) * 0.3
-                  ] as [number, number];
-                } else {
-                  currentPoint = [
-                    currentPoint[0] + (endCoords[0] - currentPoint[0]) * 0.3,
-                    currentPoint[1]
-                  ] as [number, number];
-                }
-                points.push(currentPoint);
-              }
-              points.push(endCoords);
-              
-              pathData.push({
-                type: 'bus',
-                color: getRouteColorForMode(segment.mode),
-                points
-              });
-              break;
-            case 'walk':
-              // Walking should be a relatively direct path
-              pathData.push({
-                type: 'walk',
-                color: getRouteColorForMode(segment.mode),
-                dashArray: '4,4',
-                points: [
-                  lastCoords,
-                  endCoords
-                ]
-              });
-              break;
-            case 'uber':
-            case 'taxi':
-              // Car routes follow streets but more direct than buses
-              pathData.push({
-                type: segment.mode,
-                color: getRouteColorForMode(segment.mode),
-                points: [
-                  lastCoords,
-                  [
-                    lastCoords[0] + (endCoords[0] - lastCoords[0]) * 0.33,
-                    lastCoords[1] + (endCoords[1] - lastCoords[1]) * 0.66
-                  ],
-                  [
-                    lastCoords[0] + (endCoords[0] - lastCoords[0]) * 0.66,
-                    lastCoords[1] + (endCoords[1] - lastCoords[1]) * 0.33
-                  ],
-                  endCoords
-                ]
-              });
-              break;
-            case 'ebike':
-              // Bike routes should follow streets but might take shortcuts
-              pathData.push({
-                type: 'ebike',
-                color: getRouteColorForMode(segment.mode),
-                points: [
-                  lastCoords,
-                  [
-                    lastCoords[0] + (endCoords[0] - lastCoords[0]) * 0.5 + (Math.random() - 0.5) * 0.005,
-                    lastCoords[1] + (endCoords[1] - lastCoords[1]) * 0.5 + (Math.random() - 0.5) * 0.005
-                  ],
-                  endCoords
-                ]
-              });
-              break;
-            default:
-              // Default direct line
-              pathData.push({
-                type: segment.mode,
-                color: getRouteColorForMode(segment.mode),
-                points: [lastCoords, endCoords]
-              });
-          }
-          
-          lastCoords = endCoords;
-        });
-        
-        return pathData;
-      };
-      
-      // Process a completed route with all detailed information
-      const finalizeRoute = (route: any) => {
-        // Count transfers (segments that change mode of transportation)
-        const numTransfers = route.segments.length > 0 ? route.segments.length - 1 : 0;
-        
-        // Check if route has walking/biking components to consider topology
-        const hasTopologyImpact = route.segments.some((segment: any) => 
-          segment.mode === 'walk' || segment.mode === 'ebike'
-        );
-        
-        // Calculate traffic impact for road-based segments
-        const roadBasedSegments = route.segments.filter((segment: any) => 
-          segment.mode === 'bus' || segment.mode === 'uber' || segment.mode === 'taxi'
-        );
-        
-        const trafficImpact = roadBasedSegments.length > 0 ? avgTrafficFactor : 1.0;
-        
-        // Determine wheelchair accessibility
-        const isWheelchairAccessible = route.segments.every((segment: any) => {
-          if (segment.mode === 'walk') return true; // Walking is always accessible
-          if (segment.mode === 'subway') {
-            // Check if the specific station is accessible - in a real app this would check actual station data
-            // For now we'll estimate that 40% of subway segments are wheelchair accessible
-            return segment.hasOwnProperty('wheelchairAccessible') ? segment.wheelchairAccessible : Math.random() > 0.6;
-          }
-          if (segment.mode === 'bus') {
-            // Most buses are accessible
-            return segment.hasOwnProperty('wheelchairAccessible') ? segment.wheelchairAccessible : Math.random() > 0.2;
-          }
-          if (segment.mode === 'uber' || segment.mode === 'taxi') {
-            // Some taxis/ubers are wheelchair accessible
-            return segment.hasOwnProperty('wheelchairAccessible') ? segment.wheelchairAccessible : Math.random() > 0.7;
-          }
-          return false;
-        });
-        
-        // Calculate cost breakdown
-        const costBreakdown = {
-          fare: route.segments.reduce((total: number, segment: any) => {
-            // Only count positive costs (e.g., exclude free transfers)
-            return total + (segment.cost > 0 ? segment.cost : 0);
-          }, 0),
-          additionalFees: 0,
-          totalCost: route.cost
-        };
-        
-        // Add fees for Uber/Taxi during high traffic
-        if (roadBasedSegments.length > 0 && trafficImpact > 1.2) {
-          costBreakdown.additionalFees = parseFloat((costBreakdown.fare * 0.15).toFixed(2));
-          costBreakdown.totalCost = parseFloat((costBreakdown.fare + costBreakdown.additionalFees).toFixed(2));
-        }
-        
-        // Calculate route scores
-        const scores = calculateBalancedScore(
-          route.duration, 
-          costBreakdown.totalCost, 
-          route.comfort, 
-          numTransfers,
-          userBags > 0,
-          hasTopologyImpact,
-          trafficImpact,
-          isWheelchairAccessible
-        );
-        
-        // Calculate ETA
-        const eta = calculateETA(Math.round(route.duration * trafficImpact));
-        
-        // Generate route color based on overall score
-        const routeColor = getRouteColorFromScore(scores.score);
-        
-        // Calculate CO2 emissions for the entire route
-        let totalCO2 = 0;
-        route.segments.forEach((segment: any) => {
-          // Calculate segment distance in km
-          const segmentDistance = segment.distance || 
-                                 (calculateDistance(
-                                   fromCoords[0], fromCoords[1], 
-                                   toCoords[0], toCoords[1]
-                                 ) * 1.5); // Use a multiplier to account for non-direct routes
-          
-          // Calculate CO2 for this segment
-          const segmentCO2 = calculateCO2Emissions(segment.mode, segmentDistance);
-          segment.co2 = segmentCO2;
-          totalCO2 += segmentCO2;
-        });
-        
-        // Set total CO2 for the route
-        route.co2 = totalCO2;
-        
-        // Generate path data for map
-        const pathData = generatePathData(route);
-        
-        // Add detailed information to route
-        route.numTransfers = numTransfers;
-        route.hasTopologyImpact = hasTopologyImpact;
-        route.traffic = { 
-          level: trafficImpact > 1.3 ? 'high' : trafficImpact > 1.1 ? 'medium' : 'low',
-          impact: trafficImpact
-        };
-        route.eta = eta;
-        route.costBreakdown = costBreakdown;
-        route.scores = scores;
-        route.routeColor = routeColor;
-        route.pathData = pathData;
-        route.isWheelchairAccessible = isWheelchairAccessible;
-        
-        // Enhance segments with scores
-        route.segments.forEach((segment: any) => {
-          // Score each segment based on mode and conditions
-          const segmentScore = segment.mode === 'walk' && hasTopologyImpact ? 
-            Math.max(3, 7 - Math.floor(avgTopologyDifficulty * 10)) : // Walking score affected by hills
-            segment.mode === 'ebike' && hasTopologyImpact ?
-            Math.max(2, 6 - Math.floor(avgTopologyDifficulty * 10)) : // E-bike score affected by hills
-            segment.mode === 'bus' || segment.mode === 'uber' || segment.mode === 'taxi' ?
-            Math.max(2, 9 - Math.floor((trafficImpact - 1) * 10)) : // Road transport affected by traffic
-            7; // Default reasonable score
-            
-          segment.score = segmentScore;
-          segment.adjustedDuration = segment.mode === 'walk' && hasTopologyImpact ? 
-            Math.round(segment.duration * (1 + avgTopologyDifficulty)) : // Walking is slower in hilly areas
-            (segment.mode === 'bus' || segment.mode === 'uber' || segment.mode === 'taxi') ?
-            Math.round(segment.duration * trafficImpact) : // Traffic affects road transport
-            segment.duration; // No adjustment for subway
-        });
-        
-        return route;
-      };
-      
-      // Decide on the best overall route based on distance
-      if (distance < 1) {
-        // Very short distance - walking might be best
-        bestOverallRoute.segments.push({
-          mode: 'walk',
-          startLocation: from as string,
-          endLocation: to as string,
-          duration: Math.round(distance * 20), // 20 min per mile walking
-          cost: 0,
-          lineInfo: 'Walk to destination',
-        });
-        bestOverallRoute.duration = Math.round(distance * 20);
-        bestOverallRoute.comfort = 'high';
-      } else if (distance < 5 && (bestSubwayLine || connectingBuses.length > 0)) {
-        // Medium distance with transit options
-        // First segment - walk to station
-        bestOverallRoute.segments.push({
-          mode: 'walk',
-          startLocation: from as string,
-          endLocation: bestSubwayLine ? `Subway Station near ${from}` : `Bus Stop near ${from}`,
-          duration: 5,
-          cost: 0,
-          lineInfo: `Walk to ${bestSubwayLine ? 'station' : 'bus stop'}`,
-        });
-        
-        // Second segment - transit
-        if (bestSubwayLine) {
-          bestOverallRoute.segments.push({
-            mode: 'subway',
-            startLocation: `Subway Station near ${from}`,
-            endLocation: `Subway Station near ${to}`,
-            duration: Math.round(distance * 8),
-            cost: 2.75,
-            lineInfo: `${bestSubwayLine} Train${bestSubwayLine === '7' ? ' (Flushing Line)' : ''}`,
-          });
-        } else {
-          bestOverallRoute.segments.push({
-            mode: 'bus',
-            startLocation: `Bus Stop near ${from}`,
-            endLocation: `Bus Stop near ${to}`,
-            duration: Math.round(distance * 10),
-            cost: 2.75,
-            lineInfo: `${busRoute} Bus`,
-          });
-        }
-        
-        // Last segment - walk to destination
-        bestOverallRoute.segments.push({
-          mode: 'walk',
-          startLocation: bestSubwayLine ? `Subway Station near ${to}` : `Bus Stop near ${to}`,
-          endLocation: to as string,
-          duration: 5,
-          cost: 0,
-          lineInfo: 'Walk to destination',
-        });
-        
-        bestOverallRoute.duration = bestSubwayLine 
-          ? Math.round(distance * 8) + 10 // Subway time + walking
-          : Math.round(distance * 10) + 10; // Bus time + walking
-        bestOverallRoute.cost = 2.75;
-        bestOverallRoute.comfort = bestSubwayLine ? 'medium' : 'low';
-      } else {
-        // Longer distance or no good transit - mixed mode might be best
-        // Start with transit if available for most of the route
-        if (bestSubwayLine || hasTransferOptions) {
-          bestOverallRoute.segments.push({
+        comfort: 'medium',
+        vectorScore: 0.5,
+        segments: [
+          {
             mode: 'walk',
             startLocation: from as string,
-            endLocation: `Subway Station near ${from}`,
-            duration: 5,
-            cost: 0,
-            lineInfo: 'Walk to station',
-          });
-          
-          if (bestSubwayLine) {
-            bestOverallRoute.segments.push({
-              mode: 'subway',
-              startLocation: `Subway Station near ${from}`,
-              endLocation: `Subway Station near ${to}`,
-              duration: Math.round(distance * 7),
-              cost: 2.75,
-              lineInfo: `${bestSubwayLine} Train${bestSubwayLine === '7' ? ' (Flushing Line)' : ''}`,
-            });
-          } else {
-            // Use transfer if needed
-            const fromLine = fromSubwayLines[0];
-            const toLine = toSubwayLines[0];
-            
-            bestOverallRoute.segments.push({
-              mode: 'subway',
-              startLocation: `Subway Station near ${from}`,
-              endLocation: 'Transfer Station',
-              duration: Math.round(distance * 4),
-              cost: 2.75,
-              lineInfo: `${fromLine} Train`,
-            });
-            
-            bestOverallRoute.segments.push({
-              mode: 'subway',
-              startLocation: 'Transfer Station',
-              endLocation: `Subway Station near ${to}`,
-              duration: Math.round(distance * 4),
-              cost: 0,
-              lineInfo: `${toLine} Train`,
-            });
-          }
-          
-          // For longer distances, use Uber for the last mile
-          if (distance > 8) {
-            bestOverallRoute.segments.push({
-              mode: 'uber',
-              startLocation: `Subway Station near ${to}`,
-              endLocation: to as string,
-              duration: 8,
-              cost: 7.50,
-              lineInfo: 'UberX (last mile)',
-            });
-            
-            bestOverallRoute.duration = Math.round(distance * 6) + 13; // Transit + uber + initial walk
-            bestOverallRoute.cost = 10.25; // Subway + uber
-            bestOverallRoute.comfort = 'high';
-          } else {
-            bestOverallRoute.segments.push({
-              mode: 'walk',
-              startLocation: `Subway Station near ${to}`,
-              endLocation: to as string,
-              duration: 5,
-              cost: 0,
-              lineInfo: 'Walk to destination',
-            });
-            
-            bestOverallRoute.duration = bestSubwayLine 
-              ? Math.round(distance * 7) + 10 // Subway time + walking
-              : Math.round(distance * 8) + 10; // Transfer subway time + walking
-            bestOverallRoute.cost = 2.75;
-            bestOverallRoute.comfort = 'medium';
-          }
-        } else {
-          // No good transit option - use Uber for efficiency
-          bestOverallRoute.segments.push({
-            mode: 'walk',
-            startLocation: from as string,
-            endLocation: `Pickup Point near ${from}`,
-            duration: 3,
-            cost: 0,
-            lineInfo: 'Walk to pickup point',
-          });
-          
-          bestOverallRoute.segments.push({
-            mode: 'uber',
-            startLocation: `Pickup Point near ${from}`,
             endLocation: to as string,
-            duration: Math.round(distance * 8),
-            cost: parseFloat((distance * 2.25).toFixed(2)),
-            lineInfo: 'UberX',
-          });
-          
-          bestOverallRoute.duration = Math.round(distance * 8) + 3;
-          bestOverallRoute.cost = parseFloat((distance * 2.25).toFixed(2));
-          bestOverallRoute.comfort = 'high';
-        }
+            duration: Math.round(distance * 20),
+            cost: 0,
+            lineInfo: 'Walk to destination',
+          }
+        ],
+      };
+      walkingRoute.balancedScore = calculateBalancedScore(walkingRoute.duration, walkingRoute.cost, walkingRoute.comfort, 0);
+      // Calculate CO2 for walking (0 emissions)
+      walkingRoute.co2 = calculateCO2Emissions('walk', distance * 1.60934); // Convert miles to km
+      routes.push(walkingRoute);
+
+      // Add a bike route if distance is reasonable (less than 10 miles)
+      if (distance < 10) {
+        const bikeRoute: RouteItem = {
+          id: '1',
+          name: 'Bike Route',
+          duration: Math.round(distance * 12), // ~5mph average speed
+          cost: 3.50, // Citi Bike single ride
+          comfort: 'medium',
+          vectorScore: 0.65,
+          segments: [
+            {
+              mode: 'bike',
+              startLocation: from as string,
+              endLocation: to as string,
+              duration: Math.round(distance * 12),
+              cost: 3.50,
+              lineInfo: 'Citi Bike',
+            }
+          ],
+        };
+        bikeRoute.balancedScore = calculateBalancedScore(bikeRoute.duration, bikeRoute.cost, bikeRoute.comfort, 0);
+        // Calculate CO2 for biking (0 emissions)
+        bikeRoute.co2 = calculateCO2Emissions('bike', distance * 1.60934);
+        routes.push(bikeRoute);
       }
-      
-      routes.push(bestOverallRoute);
-      
-      // 1. If subway is available, create a subway route
+
+      // Add subway routes if available
       if (bestSubwayLine || hasTransferOptions) {
         const subwayRoute: RouteItem = {
-          id: routes.length + '',
-          name: 'Fastest Route',
-          duration: Math.round(distance * 10),
-          cost: parseFloat((2.75 + (distance > 5 ? 3 : 0)).toFixed(2)),
-          comfort: distance < 8 ? 'medium' : 'low',
-          vectorScore: 0.89,
+          id: '2',
+          name: 'Subway Route',
+          duration: Math.round(distance * 8) + 10, // Transit time + walking
+          cost: 2.90,
+          comfort: 'high',
+          vectorScore: 0.8,
           segments: [
             {
               mode: 'walk',
               startLocation: from as string,
-              endLocation: `Subway Station near ${from}`,
+              endLocation: 'Subway Station',
               duration: 5,
               cost: 0,
-              lineInfo: `Walk to station`,
+              lineInfo: 'Walk to station',
+            },
+            {
+              mode: 'subway',
+              startLocation: 'Subway Station',
+              endLocation: 'Subway Station',
+              duration: Math.round(distance * 8),
+              cost: 2.90,
+              lineInfo: bestSubwayLine ? `${bestSubwayLine} Train` : 'Subway',
+            },
+            {
+              mode: 'walk',
+              startLocation: 'Subway Station',
+              endLocation: to as string,
+              duration: 5,
+              cost: 0,
+              lineInfo: 'Walk to destination',
             }
           ],
         };
-        
-        // Add the subway segment(s)
-        if (bestSubwayLine) {
-          // Direct subway line
-          subwayRoute.segments.push({
-            mode: 'subway',
-            startLocation: `Subway Station near ${from}`,
-            endLocation: `Subway Station near ${to}`,
-            duration: Math.round(distance * 8),
-            cost: 2.75,
-            lineInfo: `${bestSubwayLine} Train${bestSubwayLine === '7' ? ' (Flushing Line)' : ''}`,
-          });
-        } else if (hasTransferOptions) {
-          // Need a transfer
-          const fromLine = fromSubwayLines[0];
-          const toLine = toSubwayLines[0];
-          
-          subwayRoute.segments.push({
-            mode: 'subway',
-            startLocation: `Subway Station near ${from}`,
-            endLocation: `Transfer Station`,
-            duration: Math.round(distance * 4),
-            cost: 2.75,
-            lineInfo: `${fromLine} Train`,
-          });
-          
-          subwayRoute.segments.push({
-            mode: 'subway',
-            startLocation: `Transfer Station`,
-            endLocation: `Subway Station near ${to}`,
-            duration: Math.round(distance * 4),
-            cost: 0, // Free transfer
-            lineInfo: `${toLine} Train`,
-          });
-        }
-        
-        // Add the final walking segment
-        subwayRoute.segments.push({
-          mode: 'walk',
-          startLocation: `Subway Station near ${to}`,
-          endLocation: to as string,
-          duration: 7,
-          cost: 0,
-          lineInfo: `Walk to destination`,
-        });
-        
+        subwayRoute.balancedScore = calculateBalancedScore(subwayRoute.duration, subwayRoute.cost, subwayRoute.comfort, 0);
+        // Calculate CO2 for subway route (walking + subway segments)
+        subwayRoute.co2 = 
+          calculateCO2Emissions('walk', 0.4) + // Assuming 0.4 km walking total
+          calculateCO2Emissions('subway', distance * 1.60934); // Main subway journey
         routes.push(subwayRoute);
       }
-      
-      // 2. Always create a ride-sharing route as an option
+
+      // Add bus route
+      const busRoute: RouteItem = {
+        id: '3',
+        name: 'Bus Route',
+        duration: Math.round(distance * 15) + 10, // Bus time + walking
+        cost: 2.90,
+        comfort: 'medium',
+        vectorScore: 0.6,
+        segments: [
+          {
+            mode: 'walk',
+            startLocation: from as string,
+            endLocation: 'Bus Stop',
+            duration: 5,
+            cost: 0,
+            lineInfo: 'Walk to bus stop',
+          },
+          {
+            mode: 'bus',
+            startLocation: 'Bus Stop',
+            endLocation: 'Bus Stop',
+            duration: Math.round(distance * 15),
+            cost: 2.90,
+            lineInfo: `Local Bus`,
+          },
+          {
+            mode: 'walk',
+            startLocation: 'Bus Stop',
+            endLocation: to as string,
+            duration: 5,
+            cost: 0,
+            lineInfo: 'Walk to destination',
+          }
+        ],
+      };
+      busRoute.balancedScore = calculateBalancedScore(busRoute.duration, busRoute.cost, busRoute.comfort, 0);
+      // Calculate CO2 for bus route (walking + bus segments)
+      busRoute.co2 = 
+        calculateCO2Emissions('walk', 0.4) + // Assuming 0.4 km walking total
+        calculateCO2Emissions('bus', distance * 1.60934); // Main bus journey
+      routes.push(busRoute);
+
+      // Add express bus for longer distances
+      if (distance > 5) {
+        const expressBusRoute: RouteItem = {
+          id: '4',
+          name: 'Express Bus Route',
+          duration: Math.round(distance * 10) + 10, // Express bus time + walking
+          cost: 7.00,
+          comfort: 'high',
+          vectorScore: 0.75,
+          segments: [
+            {
+              mode: 'walk',
+              startLocation: from as string,
+              endLocation: 'Express Bus Stop',
+              duration: 5,
+              cost: 0,
+              lineInfo: 'Walk to bus stop',
+            },
+            {
+              mode: 'bus',
+              startLocation: 'Express Bus Stop',
+              endLocation: 'Express Bus Stop',
+              duration: Math.round(distance * 10),
+              cost: 7.00,
+              lineInfo: 'Express Bus',
+            },
+            {
+              mode: 'walk',
+              startLocation: 'Express Bus Stop',
+              endLocation: to as string,
+              duration: 5,
+              cost: 0,
+              lineInfo: 'Walk to destination',
+            }
+          ],
+        };
+        expressBusRoute.balancedScore = calculateBalancedScore(expressBusRoute.duration, expressBusRoute.cost, expressBusRoute.comfort, 0);
+        // Calculate CO2 for express bus route (walking + bus segments)
+        expressBusRoute.co2 = 
+          calculateCO2Emissions('walk', 0.4) + // Assuming 0.4 km walking total
+          calculateCO2Emissions('bus', distance * 1.60934); // Main bus journey
+        routes.push(expressBusRoute);
+      }
+
+      // Add a ride-sharing route as another option
       const uberRoute: RouteItem = {
-        id: routes.length + '',
-        name: 'Most Comfortable Route',
-        duration: Math.round(distance * 12),
+        id: '5',
+        name: 'Ride-Share Route',
+        duration: Math.round(distance * 3),
         cost: parseFloat((distance * 2.5).toFixed(2)),
         comfort: 'high',
         vectorScore: 0.78,
         segments: [
           {
-            mode: 'walk',
-            startLocation: from as string,
-            endLocation: `Pickup Point near ${from}`,
-            duration: 3,
-            cost: 0,
-            lineInfo: 'Walk to pickup point',
-          },
-          {
             mode: 'uber',
-            startLocation: `Pickup Point near ${from}`,
-            endLocation: `Drop-off near ${to}`,
-            duration: Math.round(distance * 10),
+            startLocation: from as string,
+            endLocation: to as string,
+            duration: Math.round(distance * 3),
             cost: parseFloat((distance * 2.5).toFixed(2)),
             lineInfo: 'UberX',
-          },
-          {
-            mode: 'walk',
-            startLocation: `Drop-off near ${to}`,
-            endLocation: to as string,
-            duration: 4,
-            cost: 0,
-            lineInfo: 'Walk to destination',
-          },
+          }
         ],
       };
+      uberRoute.balancedScore = calculateBalancedScore(uberRoute.duration, uberRoute.cost, uberRoute.comfort, 0);
+      // Calculate CO2 for ride-share route
+      uberRoute.co2 = calculateCO2Emissions('uber', distance * 1.60934);
       routes.push(uberRoute);
 
-      // Add a taxi route option
-      const taxiRoute: RouteItem = {
-        id: routes.length + '',
-        name: 'Taxi Route',
-        duration: Math.round(distance * 11),
-        cost: parseFloat((distance * 2.8).toFixed(2)),
-        comfort: 'high',
-        vectorScore: 0.77,
-        segments: [
-          {
-            mode: 'walk',
-            startLocation: from as string,
-            endLocation: `Taxi Stand near ${from}`,
-            duration: 4,
-            cost: 0,
-            lineInfo: 'Walk to taxi stand',
-          },
-          {
-            mode: 'taxi',
-            startLocation: `Taxi Stand near ${from}`,
-            endLocation: to as string,
-            duration: Math.round(distance * 9),
-            cost: parseFloat((distance * 2.8).toFixed(2)),
-            lineInfo: 'NYC Taxi',
-          }
-        ],
-      };
-      routes.push(taxiRoute);
+      // Sort routes by balanced score (highest first)
+      routes.sort((a, b) => (b.balancedScore?.score || 0) - (a.balancedScore?.score || 0));
 
-      // Add an E-bike route option if the distance is under 10 miles
-      if (distance < 10) {
-        const ebikeRoute: RouteItem = {
-          id: routes.length + '',
-          name: 'E-Bike Route',
-          duration: Math.round(distance * 15),
-          cost: 5.00,
-          comfort: 'medium',
-          vectorScore: 0.72,
-          segments: [
-            {
-              mode: 'walk',
-              startLocation: from as string,
-              endLocation: `E-Bike Station near ${from}`,
-              duration: 5,
-              cost: 0,
-              lineInfo: 'Walk to e-bike station',
-            },
-            {
-              mode: 'ebike',
-              startLocation: `E-Bike Station near ${from}`,
-              endLocation: `E-Bike Station near ${to}`,
-              duration: Math.round(distance * 12),
-              cost: 5.00,
-              lineInfo: 'Citi Bike E-Bike',
-            },
-            {
-              mode: 'walk',
-              startLocation: `E-Bike Station near ${to}`,
-              endLocation: to as string,
-              duration: 5,
-              cost: 0,
-              lineInfo: 'Walk to destination',
-            },
-          ],
-        };
-        routes.push(ebikeRoute);
-      }
-      
-      // 3. Try to create a bus route if available
-      if (busRoutesFrom.length > 0) {
-        // Use the connecting bus or an area-specific bus route
-        const busOption: RouteItem = {
-          id: routes.length + '',
-          name: 'Cheapest Route',
-          duration: Math.round(distance * 15),
-          cost: 2.75,
-          comfort: 'low',
-          vectorScore: 0.71,
-          segments: [] as any[],
-        };
-        
-        // First walk segment
-        busOption.segments.push({
-          mode: 'walk',
-          startLocation: from as string,
-          endLocation: `Bus Stop near ${from}`,
-          duration: 7,
-          cost: 0,
-          lineInfo: 'Walk to bus stop',
-        });
-        
-        // Cross-borough trips generally need subway or express bus
-        if (isCrossBoroughTrip) {
-          if (expressBusRoute) {
-            // Express bus option for cross-borough
-            busOption.segments.push({
-              mode: 'bus',
-              startLocation: `Bus Stop near ${from}`,
-              endLocation: `Bus Stop near ${to}`,
-              duration: Math.round(distance * 10), // Express buses are faster than local
-              cost: 6.75, // Express buses cost more
-              lineInfo: `${expressBusRoute} Express Bus`,
-            });
-            
-            busOption.cost = 6.75;
-            busOption.name = 'Express Bus Route';
-            busOption.comfort = 'medium';
-          } else if (fromSubwayLines.length > 0 && toSubwayLines.length > 0) {
-            // Use a combination of local bus and subway for cross-borough
-            busOption.segments.push({
-              mode: 'bus',
-              startLocation: `Bus Stop near ${from}`,
-              endLocation: `${originBorough} Subway Station`,
-              duration: 10,
-              cost: 2.75,
-              lineInfo: `${specificFromBuses[0]} Bus to subway`,
-            });
-            
-            // Add subway transfer
-            busOption.segments.push({
-              mode: 'subway',
-              startLocation: `${originBorough} Subway Station`,
-              endLocation: `${destinationBorough} Subway Station`,
-              duration: Math.round(distance * 7),
-              cost: 0, // Free transfer
-              lineInfo: `${fromSubwayLines[0]} Train`,
-            });
-            
-            busOption.name = 'Bus + Subway Route';
-          } else {
-            // Fallback to just showing subway if it exists
-            return routes;
-          }
-        } else {
-          // Local bus for same-borough trips
-          busOption.segments.push({
-            mode: 'bus',
-            startLocation: `Bus Stop near ${from}`,
-            endLocation: `Bus Stop near ${to}`,
-            duration: Math.round(distance * 12),
-            cost: 2.75,
-            lineInfo: `${busRoute} Bus`,
-          });
-        }
-        
-        // Final walk segment
-        busOption.segments.push({
-          mode: 'walk',
-          startLocation: `Bus Stop near ${to}`,
-          endLocation: to as string,
-          duration: 8,
-          cost: 0,
-          lineInfo: 'Walk to destination',
-        });
-        
-        // Update duration based on segments
-        busOption.duration = busOption.segments.reduce((total, segment) => total + segment.duration, 0);
-        
-        routes.push(busOption);
-      } else if (!bestSubwayLine && !hasTransferOptions) {
-        // 4. If no subway or bus is available, add a bike option
-        const bikeOption: RouteItem = {
-          id: routes.length + '',
-          name: 'Eco-Friendly Route',
-          duration: Math.round(distance * 18),
-          cost: 3.50,
-          comfort: 'medium',
-          vectorScore: 0.65,
-          segments: [
-            {
-              mode: 'walk',
-              startLocation: from as string,
-              endLocation: `Citi Bike Station near ${from}`,
-              duration: 5,
-              cost: 0,
-              lineInfo: 'Walk to bike station',
-            },
-            {
-              mode: 'ebike',
-              startLocation: `Citi Bike Station near ${from}`,
-              endLocation: `Citi Bike Station near ${to}`,
-              duration: Math.round(distance * 15),
-              cost: 3.50,
-              lineInfo: 'Citi Bike',
-            },
-            {
-              mode: 'walk',
-              startLocation: `Citi Bike Station near ${to}`,
-              endLocation: to as string,
-              duration: 5,
-              cost: 0,
-              lineInfo: 'Walk to destination',
-            },
-          ],
-        };
-        routes.push(bikeOption);
-      }
-      
-      // Sort routes by balanced score
-      routes.forEach(route => {
-        route.balancedScore = calculateBalancedScore(route.duration, route.cost, route.comfort, 0, false, false, 1, true);
-      });
-      
-      const mockRoutes = routes.map(finalizeRoute);
-      
-      // Always ensure we have at least 3 routes
-      if (mockRoutes.length < 3) {
-        // Generate more diverse route options if needed
-        if (mockRoutes.length === 1) {
-          // Add a slower but cheaper option
-          const cheapestRoute: RouteItem = {
-            id: '98',
-            name: 'Economy Option',
-            duration: Math.round(distance * 18),
-            cost: 2.75,
-            comfort: 'low',
-            vectorScore: 0.65,
-            segments: [
-              {
-                mode: 'walk',
-                startLocation: from as string,
-                endLocation: `Bus Stop near ${from}`,
-                duration: 10,
-                cost: 0,
-                lineInfo: 'Walk to bus stop',
-              },
-              {
-                mode: 'bus',
-                startLocation: `Bus Stop near ${from}`,
-                endLocation: `Bus Stop near ${to}`,
-                duration: Math.round(distance * 14),
-                cost: 2.75,
-                lineInfo: `Local Bus Route`,
-              },
-              {
-                mode: 'walk',
-                startLocation: `Bus Stop near ${to}`,
-                endLocation: to as string,
-                duration: 10,
-                cost: 0,
-                lineInfo: 'Walk to destination',
-              },
-            ],
-          };
-          mockRoutes.push(finalizeRoute(cheapestRoute));
-          
-          // Add a faster but expensive option
-          const fastestRoute: RouteItem = {
-            id: '99',
-            name: 'Premium Express',
-            duration: Math.round(distance * 8),
-            cost: parseFloat((distance * 2.5).toFixed(2)),
-            comfort: 'high',
-            vectorScore: 0.75,
-            segments: [
-              {
-                mode: 'walk',
-                startLocation: from as string,
-                endLocation: `Pickup near ${from}`,
-                duration: 3,
-                cost: 0,
-                lineInfo: 'Walk to pickup point',
-              },
-              {
-                mode: 'uber',
-                startLocation: `Pickup near ${from}`,
-                endLocation: to as string,
-                duration: Math.round(distance * 7),
-                cost: parseFloat((distance * 2.5).toFixed(2)),
-                lineInfo: 'UberX Direct',
-              },
-            ],
-          };
-          mockRoutes.push(finalizeRoute(fastestRoute));
-        }
-      }
-      
-      // Filter routes based on wheelchair accessibility if required
-      let filteredRoutes = mockRoutes;
-      if (requireWheelchair) {
-        filteredRoutes = mockRoutes.filter(route => route.isWheelchairAccessible);
-        
-        // If no accessible routes are found, generate at least one
-        if (filteredRoutes.length === 0) {
-          const accessibleRoute: RouteItem = {
-            id: '99',
-            name: 'Wheelchair Accessible Route',
-            duration: Math.round(distance * 10),
-            cost: parseFloat((distance * 2.8).toFixed(2)), // Slightly more expensive for accessible vehicles
-            comfort: 'high',
-            vectorScore: 0.7,
-            segments: [
-              {
-                mode: 'walk',
-                startLocation: from as string,
-                endLocation: `Accessible Pickup near ${from}`,
-                duration: 5,
-                cost: 0,
-                lineInfo: 'Short accessible walk to pickup',
-                wheelchairAccessible: true
-              },
-              {
-                mode: 'taxi',
-                startLocation: `Pickup near ${from}`,
-                endLocation: to as string,
-                duration: Math.round(distance * 9),
-                cost: parseFloat((distance * 2.8).toFixed(2)),
-                lineInfo: 'Wheelchair accessible taxi',
-                wheelchairAccessible: true
-              }
-            ],
-            isWheelchairAccessible: true
-          };
-          filteredRoutes.push(finalizeRoute(accessibleRoute));
-        }
-      }
-      
-      return filteredRoutes;
+      return routes;
     };
     
     const routes = generateRoutes();
 
-    // Ensure we always provide at least 6 routes
-    if (routes.length < 6) {
-      // If we have fewer than 6 routes, create alternative versions with minor variations
-      const existingRoutesCount = routes.length;
-      for (let i = existingRoutesCount; i < 6; i++) {
-        // Clone a route with slight modifications
-        const baseRoute = routes[i % existingRoutesCount];
-        const variationFactor = 0.05 + (Math.random() * 0.15); // 5% to 20% variation
+    // Helper function to finalize route details
+    const finalizeRoute = (route: RouteItem): RouteItem => {
+      // Calculate number of transfers
+      const numTransfers = route.segments.length > 0 ? route.segments.length - 1 : 0;
+      
+      // Check if route has walking/biking components
+      const hasTopologyImpact = route.segments.some(segment => 
+        segment.mode === 'walk' || segment.mode === 'ebike'
+      );
+      
+      // Calculate traffic impact for road-based segments
+      const roadBasedSegments = route.segments.filter(segment => 
+        segment.mode === 'bus' || segment.mode === 'uber' || segment.mode === 'taxi'
+      );
+      const trafficImpact = roadBasedSegments.length > 0 ? avgTrafficFactor : 1.0;
+      
+      // Calculate ETA
+      const now = new Date();
+      const eta = new Date(now.getTime() + route.duration * 60000);
+      
+      // Add route color based on mode
+      const routeColor = getRouteColor(route.segments[0]?.mode || 'walk');
+      
+      // Return enhanced route
+      return {
+        ...route,
+        numTransfers,
+        hasTopologyImpact,
+        traffic: { 
+          level: trafficImpact > 1.3 ? 'high' : trafficImpact > 1.1 ? 'medium' : 'low',
+          impact: trafficImpact
+        },
+        eta: eta.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        routeColor,
+        isWheelchairAccessible: true, // Simplified - in real app would check actual accessibility
+      };
+    };
+
+    const mockRoutes = routes.map(finalizeRoute);
+
+    // Only sort if we have routes
+    if (mockRoutes.length > 0) {
+      // Sort routes by their balanced score (highest to lowest)
+      mockRoutes.sort((a, b) => {
+        // Ensure we have valid scores
+        const scoreA = a.scores?.overall || a.balancedScore?.score || 0;
+        const scoreB = b.scores?.overall || b.balancedScore?.score || 0;
         
-        // Create a variation of the route
-        const variation: RouteItem = {
-          ...JSON.parse(JSON.stringify(baseRoute)),
-          id: `${baseRoute.id}-var${i}`,
-          name: `Alternative Route ${i+1}`,
-          duration: Math.round(baseRoute.duration * (1 + (Math.random() > 0.5 ? variationFactor : -variationFactor))),
-          cost: Math.round(baseRoute.cost * (1 + (Math.random() > 0.5 ? variationFactor : -variationFactor)) * 100) / 100,
-          vectorScore: baseRoute.vectorScore * (1 - (variationFactor * 0.5))
-        };
-        
-        // Adjust segments slightly
-        if (variation.segments && variation.segments.length > 0) {
-          variation.segments = variation.segments.map(segment => {
-            // Small variations in durations and costs
-            return {
-              ...segment,
-              duration: Math.max(1, Math.round(segment.duration * (1 + (Math.random() * 0.1 - 0.05)))),
-              cost: Math.max(0, Math.round(segment.cost * (1 + (Math.random() * 0.1 - 0.05)) * 100) / 100)
-            };
-          });
-          
-          // Occasionally swap a segment for a different mode if possible
-          if (variation.segments.length > 1 && Math.random() > 0.7) {
-            const segmentToChange = Math.floor(Math.random() * variation.segments.length);
-            const currentMode = variation.segments[segmentToChange].mode;
-            
-            // Choose a different mode
-            const availableModes = ['subway', 'bus', 'walk', 'bike', 'ebike', 'taxi'];
-            const alternativeModes = availableModes.filter(mode => mode !== currentMode);
-            const newMode = alternativeModes[Math.floor(Math.random() * alternativeModes.length)];
-            
-            variation.segments[segmentToChange].mode = newMode;
-            variation.segments[segmentToChange].color = getRouteColor(newMode);
-          }
+        // Sort in descending order (highest score first)
+        if (scoreA !== scoreB) {
+          return scoreB - scoreA;
         }
         
-        // Add the variation to the routes array
-        routes.push(variation);
-      }
+        // If scores are equal, prefer faster routes first
+        return (a.duration || 0) - (b.duration || 0);
+      });
+
+      // Add "best" indicator to the first route (now the best one)
+      mockRoutes[0].name = `${mockRoutes[0].name} (Best Route)`;
     }
 
+    // Return error if no routes found
+    if (mockRoutes.length === 0) {
+      return res.status(404).json({ 
+        error: "No routes found",
+        message: "We couldn't find any routes between these locations. Please try different locations or adjust your preferences."
+      });
+    }
+
+    // Return the sorted routes
     return res.status(200).json({ 
-      routes: routes.slice(0, 6),
+      routes: mockRoutes.slice(0, 6), // Return first 6 routes, now sorted from worst to best
       distance,
       fromCoords,
       toCoords,

@@ -29,56 +29,54 @@ export default function Layout({
         </Head>
 
         <header className="bg-white shadow-md">
-          <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-center">
-            <div className="flex flex-col items-center">
-              <div className="flex items-center space-x-3 mb-2">
-                <BeeIcon size={48} />
-                <Link href="/" className="text-2xl font-bold text-primary-600 flex items-center">
-                  NYC Beeline
-                </Link>
-              </div>
-              <div className="flex space-x-8">
-                <Link
-                  href="/"
-                  className={`${
-                    currentPage === 'home'
-                      ? 'text-primary-600 font-medium border-b-2 border-primary-600 pb-1'
-                      : 'text-gray-600 hover:text-primary-600 hover:border-b-2 hover:border-primary-300 pb-1'
-                  }`}
-                >
-                  Home
-                </Link>
-                <Link
-                  href="/routes"
-                  className={`${
-                    currentPage === 'routes'
-                      ? 'text-primary-600 font-medium border-b-2 border-primary-600 pb-1'
-                      : 'text-gray-600 hover:text-primary-600 hover:border-b-2 hover:border-primary-300 pb-1'
-                  }`}
-                >
-                  Routes
-                </Link>
-                <Link
-                  href="/about"
-                  className={`${
-                    currentPage === 'about'
-                      ? 'text-primary-600 font-medium border-b-2 border-primary-600 pb-1'
-                      : 'text-gray-600 hover:text-primary-600 hover:border-b-2 hover:border-primary-300 pb-1'
-                  }`}
-                >
-                  About
-                </Link>
-                <Link
-                  href="/faqs"
-                  className={`${
-                    currentPage === 'faqs'
-                      ? 'text-primary-600 font-medium border-b-2 border-primary-600 pb-1'
-                      : 'text-gray-600 hover:text-primary-600 hover:border-b-2 hover:border-primary-300 pb-1'
-                  }`}
-                >
-                  FAQs
-                </Link>
-              </div>
+          <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <BeeIcon size={48} />
+              <Link href="/" className="text-2xl font-bold text-primary-600 flex items-center">
+                NYC Beeline
+              </Link>
+            </div>
+            <div className="flex space-x-8">
+              <Link
+                href="/"
+                className={`${
+                  currentPage === 'home'
+                    ? 'text-primary-600 font-medium border-b-2 border-primary-600 pb-1'
+                    : 'text-gray-600 hover:text-primary-600 hover:border-b-2 hover:border-primary-300 pb-1'
+                }`}
+              >
+                Home
+              </Link>
+              <Link
+                href="/routes"
+                className={`${
+                  currentPage === 'routes'
+                    ? 'text-primary-600 font-medium border-b-2 border-primary-600 pb-1'
+                    : 'text-gray-600 hover:text-primary-600 hover:border-b-2 hover:border-primary-300 pb-1'
+                }`}
+              >
+                Routes
+              </Link>
+              <Link
+                href="/about"
+                className={`${
+                  currentPage === 'about'
+                    ? 'text-primary-600 font-medium border-b-2 border-primary-600 pb-1'
+                    : 'text-gray-600 hover:text-primary-600 hover:border-b-2 hover:border-primary-300 pb-1'
+                }`}
+              >
+                About
+              </Link>
+              <Link
+                href="/faqs"
+                className={`${
+                  currentPage === 'faqs'
+                    ? 'text-primary-600 font-medium border-b-2 border-primary-600 pb-1'
+                    : 'text-gray-600 hover:text-primary-600 hover:border-b-2 hover:border-primary-300 pb-1'
+                }`}
+              >
+                FAQs
+              </Link>
             </div>
           </nav>
         </header>

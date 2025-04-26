@@ -148,14 +148,14 @@ const Routes = () => {
         processedRoutes.sort((a, b) => {
           // Prefer routes that match user priority
           if (userPreferences.priority === 'speed') {
-            return a.totalDuration - b.totalDuration;
+            return b.totalDuration - a.totalDuration;
           } else if (userPreferences.priority === 'cost') {
-            return a.totalCost - b.totalCost;
+            return b.totalCost - a.totalCost;
           } else if (userPreferences.priority === 'comfort') {
             return getAdjustedComfortScore(b) - getAdjustedComfortScore(a);
           }
           // Default balanced sorting
-          return b.totalDuration - a.totalDuration;
+          return a.totalDuration - b.totalDuration;
         });
         
         // Update comfort scores with adjusted values
