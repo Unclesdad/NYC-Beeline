@@ -40,11 +40,12 @@ interface RouteOption {
   comfortScore: number;
   segments: RouteSegment[];
   totalCO2: number;
+  isWheelchairAccessible: boolean;
 }
 
 const Routes = () => {
   const router = useRouter();
-  const { from, to, priority = 'balanced', noise = 'moderate', safety = 'moderate', bags = '0' } = router.query;
+  const { from, to, priority = 'balanced', noise = 'moderate', safety = 'moderate', bags = '0', wheelchair } = router.query;
 
   // State variables
   const [loading, setLoading] = useState(true);
@@ -57,13 +58,15 @@ const Routes = () => {
     if (from && to) {
       fetchRoutes();
     }
-  }, [from, to, priority, noise, safety, bags]);
+  }, [from, to, priority, noise, safety, bags, wheelchair]);
 
   // Function to fetch routes from API
   const fetchRoutes = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/routes?from=${encodeURIComponent(String(from))}&to=${encodeURIComponent(String(to))}&priority=${priority}&noise=${noise}&safety=${safety}&bags=${bags}`);
+      const response = await fetch(
+        `/api/routes?from=${encodeURIComponent(String(from))}&to=${encodeURIComponent(String(to))}&priority=${priority}&noise=${noise}&safety=${safety}&bags=${bags}&wheelchair=${wheelchair}`
+      );
       
       if (!response.ok) {
         throw new Error('Failed to fetch routes');
@@ -105,7 +108,8 @@ const Routes = () => {
             totalDistance: route.distance || 0,
             comfortScore: route.comfort === 'high' ? 9 : route.comfort === 'medium' ? 6 : 3,
             segments: processedSegments,
-            totalCO2: route.co2 || 0
+            totalCO2: route.co2 || 0,
+            isWheelchairAccessible: route.isWheelchairAccessible || false
           };
         });
         
@@ -227,6 +231,38 @@ const Routes = () => {
     return `$${cost.toFixed(2)}`;
   };
 
+  // Add a function to get star rating display
+  const renderStarRating = (rating: number) => {
+    const maxRating = 5;
+    rating = Math.round(rating * 10) / 10; // Round to 1 decimal
+    
+    return (
+      <div className="flex items-center">
+        {[...Array(maxRating)].map((_, i) => {
+          const starValue = i + 1;
+          const fillPercentage = Math.min(100, Math.max(0, (rating - i) * 100));
+          
+          return (
+            <div key={i} className="relative h-5 w-5 text-gray-300">
+              {/* Empty star */}
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 absolute" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+              </svg>
+              
+              {/* Filled star with clipping for partial stars */}
+              <div className="overflow-hidden absolute h-5" style={{ width: `${fillPercentage}%` }}>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-honey-500" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                </svg>
+              </div>
+            </div>
+          );
+        })}
+        <span className="ml-1 text-sm text-gray-600">{rating.toFixed(1)}</span>
+      </div>
+    );
+  };
+
   return (
     <Layout currentPage="routes">
       <AnimatedBackground theme="honey" intensity="medium" pattern="hexagon">
@@ -283,7 +319,7 @@ const Routes = () => {
                         setMapData(route.segments);
                       }}
                     >
-                      <div className="flex justify-between items-start mb-3">
+                      <div className="flex justify-between items-start mb-2">
                         <div>
                           <span className="text-lg font-bold">{formatTime(route.totalDuration)}</span>
                           <div className="text-sm text-gray-600">
@@ -318,6 +354,11 @@ const Routes = () => {
                         </div>
                       </div>
                       
+                      {/* Rating display */}
+                      <div className="mb-2">
+                        {renderStarRating(route.comfortScore / 2)}
+                      </div>
+                      
                       <div className="flex items-center justify-between text-sm">
                         <div className="flex items-center">
                           <span key={`time-${route.id}`} className="inline-flex items-center text-gray-600 mr-4">
@@ -333,11 +374,21 @@ const Routes = () => {
                             {route.segments && Array.isArray(route.segments) ? route.segments.length - 1 : 0} transfer{(!route.segments || !Array.isArray(route.segments) || route.segments.length - 1 !== 1) ? 's' : ''}
                           </span>
                         </div>
-                        <div key={`co2-${route.id}`} className="text-gray-600 flex items-center">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
-                          </svg>
-                          {Math.round(route.totalCO2 || 0)} g CO2
+                        <div className="flex items-center space-x-3">
+                          {route.isWheelchairAccessible && (
+                            <span className="inline-flex items-center text-blue-600">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M10 2a1 1 0 011 1v1.323l3.954 1.582 1.599-.8a1 1 0 01.894 1.79l-1.233.616 1.738 5.42a1 1 0 01-.285 1.05A3.989 3.989 0 0115 15a3.989 3.989 0 01-2.667-1.019 1 1 0 01-.285-1.05l1.715-5.349L11 6.477V16h2a1 1 0 110 2H7a1 1 0 110-2h2V6.477L6.237 7.582l1.715 5.349a1 1 0 01-.285 1.05A3.989 3.989 0 015 15a3.989 3.989 0 01-2.667-1.019 1 1 0 01-.285-1.05l1.738-5.42-1.233-.616a1 1 0 01.894-1.79l1.599.8L9 4.323V3a1 1 0 011-1zm-5 8.274l-.818 2.552c.25.112.526.174.818.174.292 0 .569-.062.818-.174L5 10.274zm10 0l-.818 2.552c.25.112.526.174.818.174.292 0 .569-.062.818-.174L15 10.274z" clipRule="evenodd" />
+                              </svg>
+                              <span className="text-xs">Accessible</span>
+                            </span>
+                          )}
+                          <span key={`co2-${route.id}`} className="text-gray-600 flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
+                            </svg>
+                            {Math.round(route.totalCO2 || 0)} g CO2
+                          </span>
                         </div>
                       </div>
                     </div>

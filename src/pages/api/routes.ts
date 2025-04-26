@@ -131,7 +131,7 @@ export default async function handler(
     return res.status(405).json({ message: 'Method Not Allowed' });
   }
 
-  const { from, to, priority, noise, safety, bags } = req.query;
+  const { from, to, priority, noise, safety, bags, wheelchair } = req.query;
 
   if (!from || !to) {
     return res.status(400).json({ message: 'Origin and destination are required' });
@@ -151,6 +151,7 @@ export default async function handler(
     const userNoise = noise as string || 'moderate';
     const userSafety = safety as string || 'moderate';
     const userBags = parseInt(bags as string || '0', 10);
+    const requireWheelchair = wheelchair === 'true';
     
     // Calculate distance
     const distance = calculateDistance(
@@ -299,7 +300,7 @@ export default async function handler(
       const routes = [];
       
       // Calculate a balanced score to determine which route should be "Best Overall"
-      const calculateBalancedScore = (duration: number, cost: number, comfort: string, numTransfers: number, hasBags: boolean, isHilly: boolean, trafficImpact: number) => {
+      const calculateBalancedScore = (duration: number, cost: number, comfort: string, numTransfers: number, hasBags: boolean, isHilly: boolean, trafficImpact: number, isWheelchairAccessible: boolean) => {
         // Base comfort score from comfort level
         let comfortScore = comfort === 'high' ? 0.9 : comfort === 'medium' ? 0.6 : 0.3;
         
@@ -372,7 +373,18 @@ export default async function handler(
           costWeight -= 0.05;
         }
         
-        const rawScore = (timeScore * timeWeight) + (costScore * costWeight) + (comfortScore * comfortWeight) + (transferScore * transferWeight);
+        // Add wheelchair accessibility factor if needed
+        let accessibilityPenalty = 0;
+        if (requireWheelchair && !isWheelchairAccessible) {
+          // Significantly penalize non-accessible routes when wheelchair is required
+          accessibilityPenalty = 0.5;
+        }
+        
+        const rawScore = ((timeScore * timeWeight) + 
+                          (costScore * costWeight) + 
+                          (comfortScore * comfortWeight) + 
+                          (transferScore * transferWeight)) * 
+                          (1 - accessibilityPenalty);
         
         // Convert to 1-10 scale
         return {
@@ -573,6 +585,25 @@ export default async function handler(
         
         const trafficImpact = roadBasedSegments.length > 0 ? avgTrafficFactor : 1.0;
         
+        // Determine wheelchair accessibility
+        const isWheelchairAccessible = route.segments.every((segment: any) => {
+          if (segment.mode === 'walk') return true; // Walking is always accessible
+          if (segment.mode === 'subway') {
+            // Check if the specific station is accessible - in a real app this would check actual station data
+            // For now we'll estimate that 40% of subway segments are wheelchair accessible
+            return segment.hasOwnProperty('wheelchairAccessible') ? segment.wheelchairAccessible : Math.random() > 0.6;
+          }
+          if (segment.mode === 'bus') {
+            // Most buses are accessible
+            return segment.hasOwnProperty('wheelchairAccessible') ? segment.wheelchairAccessible : Math.random() > 0.2;
+          }
+          if (segment.mode === 'uber' || segment.mode === 'taxi') {
+            // Some taxis/ubers are wheelchair accessible
+            return segment.hasOwnProperty('wheelchairAccessible') ? segment.wheelchairAccessible : Math.random() > 0.7;
+          }
+          return false;
+        });
+        
         // Calculate cost breakdown
         const costBreakdown = {
           fare: route.segments.reduce((total: number, segment: any) => {
@@ -597,7 +628,8 @@ export default async function handler(
           numTransfers,
           userBags > 0,
           hasTopologyImpact,
-          trafficImpact
+          trafficImpact,
+          isWheelchairAccessible
         );
         
         // Calculate ETA
@@ -621,6 +653,7 @@ export default async function handler(
         route.scores = scores;
         route.routeColor = routeColor;
         route.pathData = pathData;
+        route.isWheelchairAccessible = isWheelchairAccessible;
         
         // Enhance segments with scores
         route.segments.forEach((segment: any) => {
@@ -1047,7 +1080,7 @@ export default async function handler(
       
       // Sort routes by balanced score
       routes.forEach(route => {
-        route.balancedScore = calculateBalancedScore(route.duration, route.cost, route.comfort, 0, false, false, 1);
+        route.balancedScore = calculateBalancedScore(route.duration, route.cost, route.comfort, 0, false, false, 1, true);
       });
       
       return routes.map(finalizeRoute);
@@ -1124,6 +1157,45 @@ export default async function handler(
           ],
         };
         mockRoutes.push(finalizeRoute(fastestRoute));
+      }
+    }
+
+    // Filter routes based on wheelchair accessibility if required
+    if (requireWheelchair) {
+      mockRoutes = mockRoutes.filter(route => route.isWheelchairAccessible);
+      
+      // If no accessible routes are found, generate at least one
+      if (mockRoutes.length === 0) {
+        const accessibleRoute = {
+          id: '99',
+          name: 'Wheelchair Accessible Route',
+          duration: Math.round(distance * 10),
+          cost: parseFloat((distance * 2.8).toFixed(2)), // Slightly more expensive for accessible vehicles
+          comfort: 'high',
+          vectorScore: 0.7,
+          segments: [
+            {
+              mode: 'walk',
+              startLocation: from as string,
+              endLocation: `Accessible Pickup near ${from}`,
+              duration: 5,
+              cost: 0,
+              lineInfo: 'Short accessible walk to pickup',
+              wheelchairAccessible: true
+            },
+            {
+              mode: 'taxi',
+              startLocation: `Pickup near ${from}`,
+              endLocation: to as string,
+              duration: Math.round(distance * 9),
+              cost: parseFloat((distance * 2.8).toFixed(2)),
+              lineInfo: 'Wheelchair accessible taxi',
+              wheelchairAccessible: true
+            }
+          ],
+          isWheelchairAccessible: true
+        };
+        mockRoutes.push(finalizeRoute(accessibleRoute));
       }
     }
 

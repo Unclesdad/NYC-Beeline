@@ -1,8 +1,113 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Image from 'next/image';
 import Layout from '@/components/Layout';
 import AnimatedBackground from '@/components/AnimatedBackground';
+
+// Custom styles for range sliders across browsers
+const sliderStyles = `
+  .slider {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 6px;
+    border-radius: 5px;
+    background: #e5e7eb;
+    outline: none;
+    margin: 10px 0;
+    position: relative;
+  }
+
+  /* Create a filled effect for the track */
+  .slider {
+    background: linear-gradient(to right, #f59e0b 0%, #f59e0b 50%, #e5e7eb 50%, #e5e7eb 100%);
+    background-size: 200% 100%;
+    transition: background-position 0.1s ease;
+  }
+
+  .slider[data-value="0"] { background-position: 100% 0; }
+  .slider[data-value="10"] { background-position: 90% 0; }
+  .slider[data-value="20"] { background-position: 80% 0; }
+  .slider[data-value="30"] { background-position: 70% 0; }
+  .slider[data-value="40"] { background-position: 60% 0; }
+  .slider[data-value="50"] { background-position: 50% 0; }
+  .slider[data-value="60"] { background-position: 40% 0; }
+  .slider[data-value="70"] { background-position: 30% 0; }
+  .slider[data-value="80"] { background-position: 20% 0; }
+  .slider[data-value="90"] { background-position: 10% 0; }
+  .slider[data-value="100"] { background-position: 0% 0; }
+
+  .slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #f59e0b;
+    cursor: pointer;
+    border: 2px solid white;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+    margin-top: -6px; /* Center the thumb on the track */
+    z-index: 2;
+    position: relative;
+  }
+
+  .slider::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #f59e0b;
+    cursor: pointer;
+    border: 2px solid white;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+    z-index: 2;
+    position: relative;
+  }
+
+  .slider::-ms-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #f59e0b;
+    cursor: pointer;
+    border: 2px solid white;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+    margin-top: 0;
+    z-index: 2;
+    position: relative;
+  }
+
+  .slider::-webkit-slider-runnable-track {
+    height: 6px;
+    border-radius: 5px;
+    background: transparent;
+  }
+
+  .slider::-moz-range-track {
+    height: 6px;
+    border-radius: 5px;
+    background: transparent;
+  }
+
+  .slider::-ms-track {
+    height: 6px;
+    border-radius: 5px;
+    background: transparent;
+  }
+  
+  /* Container styles */
+  .slider-container {
+    position: relative;
+    margin: 0 10px;
+    width: 100%;
+  }
+  
+  .preference-label {
+    display: inline-block;
+    font-size: 0.875rem;
+    margin-left: 4px;
+    color: #4b5563;
+  }
+`;
 
 export default function Home() {
   const router = useRouter();
@@ -12,17 +117,42 @@ export default function Home() {
   const [priority, setPriority] = useState('balanced');
   const [noisePreference, setNoisePreference] = useState('moderate');
   const [safetyPreference, setSafetyPreference] = useState('moderate');
+  const [noiseValue, setNoiseValue] = useState(50);
+  const [safetyValue, setSafetyValue] = useState(50);
   const [bagCount, setBagCount] = useState(0);
+  const [wheelchairAccessible, setWheelchairAccessible] = useState(false);
+
+  // Update string preferences when slider values change
+  useEffect(() => {
+    if (noiseValue < 33) {
+      setNoisePreference('low');
+    } else if (noiseValue < 67) {
+      setNoisePreference('moderate');
+    } else {
+      setNoisePreference('high');
+    }
+  }, [noiseValue]);
+
+  useEffect(() => {
+    if (safetyValue < 33) {
+      setSafetyPreference('low');
+    } else if (safetyValue < 67) {
+      setSafetyPreference('moderate');
+    } else {
+      setSafetyPreference('high');
+    }
+  }, [safetyValue]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (origin && destination) {
-      router.push(`/routes?from=${encodeURIComponent(origin)}&to=${encodeURIComponent(destination)}&priority=${priority}&noise=${noisePreference}&safety=${safetyPreference}&bags=${bagCount}`);
+      router.push(`/routes?from=${encodeURIComponent(origin)}&to=${encodeURIComponent(destination)}&priority=${priority}&noise=${noisePreference}&safety=${safetyPreference}&bags=${bagCount}&wheelchair=${wheelchairAccessible}`);
     }
   };
 
   return (
     <Layout currentPage="home">
+      <style jsx global>{sliderStyles}</style>
       <AnimatedBackground theme="honey" intensity="medium" pattern="hexagon">
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24">
           <div className="lg:grid lg:grid-cols-2 lg:gap-12 items-center">
@@ -83,119 +213,144 @@ export default function Home() {
                   
                   {showPreferences ? (
                     <div className="space-y-4 pt-4 border-t border-gray-200">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          What is your priority?
-                        </label>
-                        <div className="grid grid-cols-2 gap-2">
-                          <div 
-                            className={`border rounded-md px-3 py-2 cursor-pointer text-center text-sm ${priority === 'speed' ? 'bg-honey-50 border-honey-500 text-honey-700' : 'border-gray-300 hover:bg-gray-50'}`}
-                            onClick={() => setPriority('speed')}
+                      <div className="mb-4">
+                        <label htmlFor="priority" className="block text-gray-700 font-medium mb-2">Priority</label>
+                        <div className="relative">
+                          <select
+                            id="priority"
+                            name="priority"
+                            className="appearance-none block w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-honey-500 focus:border-honey-500 bg-white pr-10"
+                            value={priority}
+                            onChange={(e) => setPriority(e.target.value)}
                           >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mx-auto mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            <option value="balanced">Balanced</option>
+                            <option value="speed">Speed</option>
+                            <option value="cost">Cost</option>
+                            <option value="comfort">Comfort</option>
+                          </select>
+                          <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+                            <svg className="h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
                             </svg>
-                            Speed
-                          </div>
-                          <div 
-                            className={`border rounded-md px-3 py-2 cursor-pointer text-center text-sm ${priority === 'cost' ? 'bg-honey-50 border-honey-500 text-honey-700' : 'border-gray-300 hover:bg-gray-50'}`}
-                            onClick={() => setPriority('cost')}
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mx-auto mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            Cost
-                          </div>
-                          <div 
-                            className={`border rounded-md px-3 py-2 cursor-pointer text-center text-sm ${priority === 'comfort' ? 'bg-honey-50 border-honey-500 text-honey-700' : 'border-gray-300 hover:bg-gray-50'}`}
-                            onClick={() => setPriority('comfort')}
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mx-auto mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-                            </svg>
-                            Comfort
-                          </div>
-                          <div 
-                            className={`border rounded-md px-3 py-2 cursor-pointer text-center text-sm ${priority === 'balanced' ? 'bg-honey-50 border-honey-500 text-honey-700' : 'border-gray-300 hover:bg-gray-50'}`}
-                            onClick={() => setPriority('balanced')}
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mx-auto mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" />
-                            </svg>
-                            Balanced
                           </div>
                         </div>
                       </div>
                       
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          How sensitive are you to noise?
-                        </label>
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-gray-500">Low</span>
-                          <div className="relative w-full mx-3">
-                            <div className="h-1 bg-gray-200 rounded-full">
-                              <div className="absolute h-5 w-5 rounded-full bg-honey-500 -mt-2 transform -translate-x-1/2 cursor-pointer"
-                                  style={{ left: noisePreference === 'low' ? '20%' : noisePreference === 'moderate' ? '50%' : '80%' }}
-                                  onClick={() => {
-                                    const nextPreference = noisePreference === 'low' ? 'moderate' : 
-                                                          noisePreference === 'moderate' ? 'high' : 'low';
-                                    setNoisePreference(nextPreference);
-                                  }}
-                              />
-                            </div>
-                          </div>
-                          <span className="text-xs text-gray-500">High</span>
+                      <div className="mb-4">
+                        <label className="block text-gray-700 font-medium mb-2">Sound Sensitivity</label>
+                        <div className="flex space-x-4">
+                          <label className="flex items-center">
+                            <input
+                              type="radio"
+                              name="noise"
+                              value="low"
+                              checked={noisePreference === 'low'}
+                              onChange={() => setNoisePreference('low')}
+                              className="h-4 w-4 text-honey-600 focus:ring-honey-500 border-gray-300"
+                            />
+                            <span className="ml-2 text-sm text-gray-700">Low</span>
+                          </label>
+                          
+                          <label className="flex items-center">
+                            <input
+                              type="radio"
+                              name="noise"
+                              value="moderate"
+                              checked={noisePreference === 'moderate'}
+                              onChange={() => setNoisePreference('moderate')}
+                              className="h-4 w-4 text-honey-600 focus:ring-honey-500 border-gray-300"
+                            />
+                            <span className="ml-2 text-sm text-gray-700">Moderate</span>
+                          </label>
+                          
+                          <label className="flex items-center">
+                            <input
+                              type="radio"
+                              name="noise"
+                              value="high"
+                              checked={noisePreference === 'high'}
+                              onChange={() => setNoisePreference('high')}
+                              className="h-4 w-4 text-honey-600 focus:ring-honey-500 border-gray-300"
+                            />
+                            <span className="ml-2 text-sm text-gray-700">High</span>
+                          </label>
                         </div>
                       </div>
                       
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          How important is area safety?
-                        </label>
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-gray-500">Low</span>
-                          <div className="relative w-full mx-3">
-                            <div className="h-1 bg-gray-200 rounded-full">
-                              <div className="absolute h-5 w-5 rounded-full bg-honey-500 -mt-2 transform -translate-x-1/2 cursor-pointer"
-                                  style={{ left: safetyPreference === 'low' ? '20%' : safetyPreference === 'moderate' ? '50%' : '80%' }}
-                                  onClick={() => {
-                                    const nextPreference = safetyPreference === 'low' ? 'moderate' : 
-                                                          safetyPreference === 'moderate' ? 'high' : 'low';
-                                    setSafetyPreference(nextPreference);
-                                  }}
-                              />
-                            </div>
-                          </div>
-                          <span className="text-xs text-gray-500">High</span>
+                      <div className="mb-4">
+                        <label className="block text-gray-700 font-medium mb-2">Safety Preference</label>
+                        <div className="flex space-x-4">
+                          <label className="flex items-center">
+                            <input
+                              type="radio"
+                              name="safety"
+                              value="low"
+                              checked={safetyPreference === 'low'}
+                              onChange={() => setSafetyPreference('low')}
+                              className="h-4 w-4 text-honey-600 focus:ring-honey-500 border-gray-300"
+                            />
+                            <span className="ml-2 text-sm text-gray-700">Low</span>
+                          </label>
+                          
+                          <label className="flex items-center">
+                            <input
+                              type="radio"
+                              name="safety"
+                              value="moderate"
+                              checked={safetyPreference === 'moderate'}
+                              onChange={() => setSafetyPreference('moderate')}
+                              className="h-4 w-4 text-honey-600 focus:ring-honey-500 border-gray-300"
+                            />
+                            <span className="ml-2 text-sm text-gray-700">Moderate</span>
+                          </label>
+                          
+                          <label className="flex items-center">
+                            <input
+                              type="radio"
+                              name="safety"
+                              value="high"
+                              checked={safetyPreference === 'high'}
+                              onChange={() => setSafetyPreference('high')}
+                              className="h-4 w-4 text-honey-600 focus:ring-honey-500 border-gray-300"
+                            />
+                            <span className="ml-2 text-sm text-gray-700">High</span>
+                          </label>
                         </div>
                       </div>
                       
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          How many bags are you carrying?
-                        </label>
-                        <div className="flex items-center">
-                          <button 
-                            type="button"
-                            className="bg-gray-100 h-8 w-8 rounded-full flex items-center justify-center border border-gray-300 text-gray-600 hover:bg-honey-50 hover:border-honey-300"
-                            onClick={() => setBagCount(Math.max(0, bagCount - 1))}
+                      <div className="mb-4">
+                        <label htmlFor="seatImportance" className="block text-gray-700 font-medium mb-2">How important is having a seat?</label>
+                        <div className="relative">
+                          <select
+                            id="seatImportance"
+                            name="seatImportance"
+                            className="appearance-none block w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-honey-500 focus:border-honey-500 bg-white pr-10"
+                            value={bagCount}
+                            onChange={(e) => setBagCount(parseInt(e.target.value))}
                           >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                              <path fillRule="evenodd" d="M3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
+                            <option value="0">Not important</option>
+                            <option value="1">Somewhat important</option>
+                            <option value="2">Very important</option>
+                          </select>
+                          <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+                            <svg className="h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
                             </svg>
-                          </button>
-                          <div className="mx-4 font-medium w-8 text-center">{bagCount}</div>
-                          <button 
-                            type="button"
-                            className="bg-gray-100 h-8 w-8 rounded-full flex items-center justify-center border border-gray-300 text-gray-600 hover:bg-honey-50 hover:border-honey-300"
-                            onClick={() => setBagCount(Math.min(5, bagCount + 1))}
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                              <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-                            </svg>
-                          </button>
+                          </div>
                         </div>
+                      </div>
+                      
+                      <div className="mb-4">
+                        <label className="flex items-center">
+                          <input
+                            type="checkbox"
+                            name="wheelchair"
+                            checked={wheelchairAccessible}
+                            onChange={(e) => setWheelchairAccessible(e.target.checked)}
+                            className="h-4 w-4 text-honey-600 focus:ring-honey-500 border-gray-300 rounded"
+                          />
+                          <span className="ml-2 text-gray-700">Wheelchair accessible route</span>
+                        </label>
                       </div>
                       
                       <button
