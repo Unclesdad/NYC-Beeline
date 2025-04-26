@@ -536,7 +536,7 @@ export default function Home() {
         <section className="bg-white/70 backdrop-blur-sm py-12">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center">
-              <h2 className="text-3xl font-extrabold text-gray-900">Why NYC Beeline?</h2>
+              <h2 className="text-3xl font-extrabold text-gray-900">Optimize your path</h2>
               <p className="mt-4 max-w-2xl mx-auto text-xl text-gray-500">
                 Inter-borough travel in NYC can be challenging. We're here to make it easier.
               </p>

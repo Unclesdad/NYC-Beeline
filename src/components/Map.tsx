@@ -459,6 +459,47 @@ const generateRealisticWaypoints = (
     return generateDrivingPath(start, end);
   }
   
+  // For e-bikes, create a path that's more direct than walking but follows some street patterns
+  if (mode === 'ebike' || mode === 'bike') {
+    // E-bikes can take bike lanes and shortcuts
+    const points: Coordinates[] = [];
+    points.push(start);
+    
+    // Calculate distance to determine complexity
+    const distance = calculateDistance(start[0], start[1], end[0], end[1]);
+    const numSegments = Math.max(3, Math.ceil(distance * 3));
+    
+    // Create a relatively direct path with some turns for bike lanes
+    let currentPoint = start;
+    
+    for (let i = 1; i < numSegments; i++) {
+      const progress = i / numSegments;
+      
+      // Bikes can take more direct routes than cars but still follow some street patterns
+      // Mix of grid following and direct path
+      if (i % 2 === 1) {
+        // More direct path
+        const newPoint: Coordinates = [
+          currentPoint[0] + (end[0] - currentPoint[0]) * 0.5,
+          currentPoint[1] + (end[1] - currentPoint[1]) * 0.5
+        ];
+        points.push(newPoint);
+        currentPoint = newPoint;
+      } else {
+        // Follow grid
+        const gridPoint: Coordinates = [
+          currentPoint[0] + (end[0] - start[0]) * (progress + (Math.random() - 0.5) * 0.1),
+          currentPoint[1] + (end[1] - start[1]) * (progress + (Math.random() - 0.5) * 0.1)
+        ];
+        points.push(gridPoint);
+        currentPoint = gridPoint;
+      }
+    }
+    
+    points.push(end);
+    return points;
+  }
+  
   // For other modes or fallback, use a curved path
   const distance = calculateDistance(start[0], start[1], end[0], end[1]);
   // Significantly increase the number of points for smoother lines
@@ -752,6 +793,42 @@ const generateCurvedPath = (start: Coordinates, end: Coordinates, numPoints: num
   
   return points;
 };
+
+// Generate a random location within NYC boundaries
+const generateRandomNYCLocation = (): Coordinates => {
+  // NYC boundaries (approximate)
+  const nycBounds = {
+    north: 40.915, // Bronx
+    south: 40.495, // Staten Island
+    east: -73.700, // Queens
+    west: -74.255  // Staten Island
+  };
+  
+  // Generate a random point within Manhattan for more realistic locations
+  const manhattanBounds = {
+    north: 40.880, // Upper Manhattan
+    south: 40.700, // Lower Manhattan
+    east: -73.920, // East side
+    west: -74.020  // West side
+  };
+  
+  // 80% chance to be in Manhattan for more central locations
+  if (Math.random() < 0.8) {
+    return [
+      manhattanBounds.south + Math.random() * (manhattanBounds.north - manhattanBounds.south),
+      manhattanBounds.west + Math.random() * (manhattanBounds.east - manhattanBounds.west)
+    ];
+  }
+  
+  // 20% chance to be elsewhere in NYC
+  return [
+    nycBounds.south + Math.random() * (nycBounds.north - nycBounds.south),
+    nycBounds.west + Math.random() * (nycBounds.east - nycBounds.west)
+  ];
+};
+
+// Default NYC location (Times Square)
+const defaultLocation: Coordinates = [40.7580, -73.9855];
 
 // Component props
 interface MapProps {

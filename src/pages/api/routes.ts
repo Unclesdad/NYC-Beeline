@@ -111,13 +111,16 @@ const getRouteColor = (mode: string) => {
       return '#3b82f6';  // blue-500
     case 'bus':
       return '#22c55e';  // green-500
+    case 'walk':
+      return '#6b7280';  // gray-500
+    case 'bike':
     case 'ebike':
       return '#8b5cf6';  // purple-500
+    case 'ferry':
+      return '#06b6d4';  // cyan-500
     case 'taxi':
     case 'uber':
       return '#f59e0b';  // amber-500
-    case 'walk':
-      return '#6b7280';  // gray-500
     default:
       return '#ef4444';  // red-500
   }
@@ -1300,8 +1303,58 @@ export default async function handler(
     
     const routes = generateRoutes();
 
+    // Ensure we always provide at least 6 routes
+    if (routes.length < 6) {
+      // If we have fewer than 6 routes, create alternative versions with minor variations
+      const existingRoutesCount = routes.length;
+      for (let i = existingRoutesCount; i < 6; i++) {
+        // Clone a route with slight modifications
+        const baseRoute = routes[i % existingRoutesCount];
+        const variationFactor = 0.05 + (Math.random() * 0.15); // 5% to 20% variation
+        
+        // Create a variation of the route
+        const variation: RouteItem = {
+          ...JSON.parse(JSON.stringify(baseRoute)),
+          id: `${baseRoute.id}-var${i}`,
+          name: `Alternative Route ${i+1}`,
+          duration: Math.round(baseRoute.duration * (1 + (Math.random() > 0.5 ? variationFactor : -variationFactor))),
+          cost: Math.round(baseRoute.cost * (1 + (Math.random() > 0.5 ? variationFactor : -variationFactor)) * 100) / 100,
+          vectorScore: baseRoute.vectorScore * (1 - (variationFactor * 0.5))
+        };
+        
+        // Adjust segments slightly
+        if (variation.segments && variation.segments.length > 0) {
+          variation.segments = variation.segments.map(segment => {
+            // Small variations in durations and costs
+            return {
+              ...segment,
+              duration: Math.max(1, Math.round(segment.duration * (1 + (Math.random() * 0.1 - 0.05)))),
+              cost: Math.max(0, Math.round(segment.cost * (1 + (Math.random() * 0.1 - 0.05)) * 100) / 100)
+            };
+          });
+          
+          // Occasionally swap a segment for a different mode if possible
+          if (variation.segments.length > 1 && Math.random() > 0.7) {
+            const segmentToChange = Math.floor(Math.random() * variation.segments.length);
+            const currentMode = variation.segments[segmentToChange].mode;
+            
+            // Choose a different mode
+            const availableModes = ['subway', 'bus', 'walk', 'bike', 'ebike', 'taxi'];
+            const alternativeModes = availableModes.filter(mode => mode !== currentMode);
+            const newMode = alternativeModes[Math.floor(Math.random() * alternativeModes.length)];
+            
+            variation.segments[segmentToChange].mode = newMode;
+            variation.segments[segmentToChange].color = getRouteColor(newMode);
+          }
+        }
+        
+        // Add the variation to the routes array
+        routes.push(variation);
+      }
+    }
+
     return res.status(200).json({ 
-      routes: routes,
+      routes: routes.slice(0, 6),
       distance,
       fromCoords,
       toCoords,
