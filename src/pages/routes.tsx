@@ -162,7 +162,10 @@ const Routes = () => {
   };
 
   // Helper function to format cost
-  const formatCost = (cost: number) => {
+  const formatCost = (cost: number | undefined | null) => {
+    if (cost === undefined || cost === null) {
+      return '$0.00';
+    }
     return `$${cost.toFixed(2)}`;
   };
 
@@ -259,20 +262,20 @@ const Routes = () => {
                       
                       <div className="flex items-center justify-between text-sm">
                         <div className="flex items-center">
-                          <span className="inline-flex items-center text-gray-600 mr-4">
+                          <span key={`time-${route.id}`} className="inline-flex items-center text-gray-600 mr-4">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                             </svg>
                             {new Date().toLocaleTimeString([], {hour: 'numeric', minute:'2-digit'})}
                           </span>
-                          <span className="inline-flex items-center text-gray-600">
+                          <span key={`transfer-${route.id}`} className="inline-flex items-center text-gray-600">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
                             </svg>
                             {route.segments.length - 1} transfer{route.segments.length - 1 !== 1 ? 's' : ''}
                           </span>
                         </div>
-                        <div className="text-gray-600 flex items-center">
+                        <div key={`co2-${route.id}`} className="text-gray-600 flex items-center">
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
                           </svg>
@@ -332,12 +335,16 @@ const Routes = () => {
                         </div>
                         
                         <div className="mt-2 space-y-2">
-                          {segment.steps.map((step, stepIdx) => (
+                          {segment.steps && Array.isArray(segment.steps) ? segment.steps.map((step, stepIdx) => (
                             <div key={stepIdx} className="text-sm text-gray-700 ml-4 flex items-start">
-                              <span className="h-2 w-2 rounded-full bg-gray-300 mt-2 mr-2"></span>
-                              <span>{step.instruction}</span>
+                              <span key={`dot-${segment.id}-${stepIdx}`} className="h-2 w-2 rounded-full bg-gray-300 mt-2 mr-2"></span>
+                              <span key={`instruction-${segment.id}-${stepIdx}`}>{step.instruction}</span>
                             </div>
-                          ))}
+                          )) : (
+                            <div className="text-sm text-gray-700 ml-4">
+                              No detailed steps available
+                            </div>
+                          )}
                         </div>
                         
                         {segment.transfers > 0 && (
@@ -347,28 +354,32 @@ const Routes = () => {
                         )}
                         
                         <div className="mt-2 flex flex-wrap gap-2 ml-4">
-                          <span className={`inline-flex items-center text-xs px-2 py-1 rounded-full ${
-                            segment.congestion === 'low' ? 'bg-green-100 text-green-800' :
-                            segment.congestion === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-red-100 text-red-800'
-                          }`}>
-                            {segment.congestion === 'low' ? 'Low Congestion' :
-                             segment.congestion === 'medium' ? 'Medium Congestion' :
-                             'High Congestion'}
-                          </span>
+                          {segment.congestion && (
+                            <span key={`congestion-${segment.id}`} className={`inline-flex items-center text-xs px-2 py-1 rounded-full ${
+                              segment.congestion === 'low' ? 'bg-green-100 text-green-800' :
+                              segment.congestion === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-red-100 text-red-800'
+                            }`}>
+                              {segment.congestion === 'low' ? 'Low Congestion' :
+                               segment.congestion === 'medium' ? 'Medium Congestion' :
+                               'High Congestion'}
+                            </span>
+                          )}
                           
-                          <span className={`inline-flex items-center text-xs px-2 py-1 rounded-full ${
-                            segment.crowdLevel === 'low' ? 'bg-green-100 text-green-800' :
-                            segment.crowdLevel === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-red-100 text-red-800'
-                          }`}>
-                            {segment.crowdLevel === 'low' ? 'Not Crowded' :
-                             segment.crowdLevel === 'medium' ? 'Somewhat Crowded' :
-                             'Very Crowded'}
-                          </span>
+                          {segment.crowdLevel && (
+                            <span key={`crowd-${segment.id}`} className={`inline-flex items-center text-xs px-2 py-1 rounded-full ${
+                              segment.crowdLevel === 'low' ? 'bg-green-100 text-green-800' :
+                              segment.crowdLevel === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-red-100 text-red-800'
+                            }`}>
+                              {segment.crowdLevel === 'low' ? 'Not Crowded' :
+                               segment.crowdLevel === 'medium' ? 'Somewhat Crowded' :
+                               'Very Crowded'}
+                            </span>
+                          )}
                           
                           {segment.accessibility && (
-                            <span className="inline-flex items-center text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-800">
+                            <span key={`accessibility-${segment.id}`} className="inline-flex items-center text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-800">
                               <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
                               </svg>
