@@ -592,8 +592,401 @@ export default async function handler(
       uberRoute.co2 = calculateCO2Emissions('uber', distance * 1.60934);
       routes.push(uberRoute);
 
-      // Sort routes by balanced score (highest first)
-      routes.sort((a, b) => (b.balancedScore?.score || 0) - (a.balancedScore?.score || 0));
+      // Add a combined subway + bus route for longer distances
+      if (distance > 3 && (bestSubwayLine || hasTransferOptions)) {
+        const subwayBusRoute: RouteItem = {
+          id: '6',
+          name: 'Subway + Bus Route',
+          duration: Math.round(distance * 10) + 15, // Transit time + transfers
+          cost: 2.90, // Single fare covers both
+          comfort: 'medium',
+          vectorScore: 0.7,
+          segments: [
+            {
+              mode: 'walk',
+              startLocation: from as string,
+              endLocation: 'Subway Station',
+              duration: 5,
+              cost: 0,
+              lineInfo: 'Walk to station',
+            },
+            {
+              mode: 'subway',
+              startLocation: 'Subway Station',
+              endLocation: 'Transfer Station',
+              duration: Math.round(distance * 6),
+              cost: 2.90,
+              lineInfo: bestSubwayLine ? `${bestSubwayLine} Train` : 'Subway',
+            },
+            {
+              mode: 'bus',
+              startLocation: 'Transfer Station',
+              endLocation: 'Bus Stop',
+              duration: Math.round(distance * 4),
+              cost: 0,
+              lineInfo: 'Local Bus',
+            },
+            {
+              mode: 'walk',
+              startLocation: 'Bus Stop',
+              endLocation: to as string,
+              duration: 5,
+              cost: 0,
+              lineInfo: 'Walk to destination',
+            }
+          ],
+        };
+        subwayBusRoute.balancedScore = calculateBalancedScore(subwayBusRoute.duration, subwayBusRoute.cost, subwayBusRoute.comfort, 2);
+        subwayBusRoute.co2 = calculateCO2Emissions('subway', distance * 0.6 * 1.60934) + 
+                            calculateCO2Emissions('bus', distance * 0.4 * 1.60934);
+        routes.push(subwayBusRoute);
+      }
+
+      // Add an e-bike route if distance is reasonable
+      if (distance < 12) {
+        const ebikeRoute: RouteItem = {
+          id: '7',
+          name: 'E-Bike Route',
+          duration: Math.round(distance * 10), // ~6mph average speed
+          cost: 5.00, // E-bike rental
+          comfort: 'medium',
+          vectorScore: 0.7,
+          segments: [
+            {
+              mode: 'ebike',
+              startLocation: from as string,
+              endLocation: to as string,
+              duration: Math.round(distance * 10),
+              cost: 5.00,
+              lineInfo: 'E-Bike Share',
+            }
+          ],
+        };
+        ebikeRoute.balancedScore = calculateBalancedScore(ebikeRoute.duration, ebikeRoute.cost, ebikeRoute.comfort, 0);
+        ebikeRoute.co2 = calculateCO2Emissions('ebike', distance * 1.60934);
+        routes.push(ebikeRoute);
+      }
+
+      // Add a shared ride route
+      const sharedRoute: RouteItem = {
+        id: '8',
+        name: 'Shared Ride Route',
+        duration: Math.round(distance * 4), // Slightly longer than private ride
+        cost: parseFloat((distance * 1.8).toFixed(2)), // Cheaper than private
+        comfort: 'medium',
+        vectorScore: 0.75,
+        segments: [
+          {
+            mode: 'shared',
+            startLocation: from as string,
+            endLocation: to as string,
+            duration: Math.round(distance * 4),
+            cost: parseFloat((distance * 1.8).toFixed(2)),
+            lineInfo: 'UberPool/Shared',
+          }
+        ],
+      };
+      sharedRoute.balancedScore = calculateBalancedScore(sharedRoute.duration, sharedRoute.cost, sharedRoute.comfort, 0);
+      sharedRoute.co2 = calculateCO2Emissions('shared', distance * 1.60934);
+      routes.push(sharedRoute);
+
+      // Add a subway + walk route for medium distances
+      if (bestSubwayLine || hasTransferOptions) {
+        const subwayWalkRoute: RouteItem = {
+          id: '9',
+          name: 'Subway + Walk Route',
+          duration: Math.round(distance * 9) + 15,
+          cost: 2.90,
+          comfort: 'medium',
+          vectorScore: 0.7,
+          segments: [
+            {
+              mode: 'walk',
+              startLocation: from as string,
+              endLocation: 'Subway Station',
+              duration: 7,
+              cost: 0,
+              lineInfo: 'Walk to station',
+            },
+            {
+              mode: 'subway',
+              startLocation: 'Subway Station',
+              endLocation: 'Subway Station',
+              duration: Math.round(distance * 6),
+              cost: 2.90,
+              lineInfo: bestSubwayLine ? `${bestSubwayLine} Train` : 'Subway',
+            },
+            {
+              mode: 'walk',
+              startLocation: 'Subway Station',
+              endLocation: to as string,
+              duration: 8,
+              cost: 0,
+              lineInfo: 'Walk to destination',
+            }
+          ],
+        };
+        subwayWalkRoute.balancedScore = calculateBalancedScore(subwayWalkRoute.duration, subwayWalkRoute.cost, subwayWalkRoute.comfort, 1);
+        subwayWalkRoute.co2 = calculateCO2Emissions('subway', distance * 1.60934);
+        routes.push(subwayWalkRoute);
+      }
+
+      // Add a bike + subway combination for longer distances
+      if (distance > 2 && (bestSubwayLine || hasTransferOptions)) {
+        const bikeSubwayRoute: RouteItem = {
+          id: '10',
+          name: 'Bike + Subway Route',
+          duration: Math.round(distance * 7) + 10,
+          cost: 5.40, // Bike share + subway fare
+          comfort: 'medium',
+          vectorScore: 0.75,
+          segments: [
+            {
+              mode: 'bike',
+              startLocation: from as string,
+              endLocation: 'Subway Station',
+              duration: Math.round(distance * 0.3 * 12),
+              cost: 2.50,
+              lineInfo: 'Bike to station',
+            },
+            {
+              mode: 'subway',
+              startLocation: 'Subway Station',
+              endLocation: 'Subway Station',
+              duration: Math.round(distance * 0.5 * 8),
+              cost: 2.90,
+              lineInfo: bestSubwayLine ? `${bestSubwayLine} Train` : 'Subway',
+            },
+            {
+              mode: 'walk',
+              startLocation: 'Subway Station',
+              endLocation: to as string,
+              duration: 5,
+              cost: 0,
+              lineInfo: 'Walk to destination',
+            }
+          ],
+        };
+        bikeSubwayRoute.balancedScore = calculateBalancedScore(bikeSubwayRoute.duration, bikeSubwayRoute.cost, bikeSubwayRoute.comfort, 1);
+        bikeSubwayRoute.co2 = calculateCO2Emissions('subway', distance * 0.5 * 1.60934);
+        routes.push(bikeSubwayRoute);
+      }
+
+      // Add an express bus + local bus combination for cross-borough trips
+      if (isCrossBoroughTrip && distance > 5) {
+        const expressBusComboRoute: RouteItem = {
+          id: '11',
+          name: 'Express + Local Bus Route',
+          duration: Math.round(distance * 12) + 15,
+          cost: 7.00, // Express bus fare covers local transfer
+          comfort: 'medium',
+          vectorScore: 0.65,
+          segments: [
+            {
+              mode: 'walk',
+              startLocation: from as string,
+              endLocation: 'Express Bus Stop',
+              duration: 5,
+              cost: 0,
+              lineInfo: 'Walk to express bus',
+            },
+            {
+              mode: 'bus',
+              startLocation: 'Express Bus Stop',
+              endLocation: 'Transfer Point',
+              duration: Math.round(distance * 0.7 * 10),
+              cost: 7.00,
+              lineInfo: 'Express Bus',
+            },
+            {
+              mode: 'bus',
+              startLocation: 'Transfer Point',
+              endLocation: 'Bus Stop',
+              duration: Math.round(distance * 0.3 * 15),
+              cost: 0,
+              lineInfo: 'Local Bus',
+            },
+            {
+              mode: 'walk',
+              startLocation: 'Bus Stop',
+              endLocation: to as string,
+              duration: 5,
+              cost: 0,
+              lineInfo: 'Walk to destination',
+            }
+          ],
+        };
+        expressBusComboRoute.balancedScore = calculateBalancedScore(expressBusComboRoute.duration, expressBusComboRoute.cost, expressBusComboRoute.comfort, 2);
+        expressBusComboRoute.co2 = calculateCO2Emissions('bus', distance * 1.60934);
+        routes.push(expressBusComboRoute);
+      }
+
+      // Add a ferry route if available between boroughs
+      if (isCrossBoroughTrip && (originBorough === 'Manhattan' || destinationBorough === 'Manhattan')) {
+        const ferryRoute: RouteItem = {
+          id: '12',
+          name: 'Ferry Route',
+          duration: Math.round(distance * 8) + 20,
+          cost: 2.90,
+          comfort: 'high',
+          vectorScore: 0.8,
+          segments: [
+            {
+              mode: 'walk',
+              startLocation: from as string,
+              endLocation: 'Ferry Terminal',
+              duration: 10,
+              cost: 0,
+              lineInfo: 'Walk to ferry',
+            },
+            {
+              mode: 'ferry',
+              startLocation: 'Ferry Terminal',
+              endLocation: 'Ferry Terminal',
+              duration: Math.round(distance * 8),
+              cost: 2.90,
+              lineInfo: 'NYC Ferry',
+            },
+            {
+              mode: 'walk',
+              startLocation: 'Ferry Terminal',
+              endLocation: to as string,
+              duration: 10,
+              cost: 0,
+              lineInfo: 'Walk to destination',
+            }
+          ],
+        };
+        ferryRoute.balancedScore = calculateBalancedScore(ferryRoute.duration, ferryRoute.cost, ferryRoute.comfort, 1);
+        ferryRoute.co2 = calculateCO2Emissions('ferry', distance * 1.60934);
+        routes.push(ferryRoute);
+      }
+
+      // Add a bike + bus combination for medium distances
+      if (distance > 2 && distance < 10) {
+        const bikeBusRoute: RouteItem = {
+          id: '13',
+          name: 'Bike + Bus Route',
+          duration: Math.round(distance * 11) + 10,
+          cost: 5.40, // Bike share + bus fare
+          comfort: 'medium',
+          vectorScore: 0.7,
+          segments: [
+            {
+              mode: 'bike',
+              startLocation: from as string,
+              endLocation: 'Bus Stop',
+              duration: Math.round(distance * 0.4 * 12),
+              cost: 2.50,
+              lineInfo: 'Bike to bus stop',
+            },
+            {
+              mode: 'bus',
+              startLocation: 'Bus Stop',
+              endLocation: 'Bus Stop',
+              duration: Math.round(distance * 0.6 * 15),
+              cost: 2.90,
+              lineInfo: 'Local Bus',
+            },
+            {
+              mode: 'walk',
+              startLocation: 'Bus Stop',
+              endLocation: to as string,
+              duration: 5,
+              cost: 0,
+              lineInfo: 'Walk to destination',
+            }
+          ],
+        };
+        bikeBusRoute.balancedScore = calculateBalancedScore(bikeBusRoute.duration, bikeBusRoute.cost, bikeBusRoute.comfort, 1);
+        bikeBusRoute.co2 = calculateCO2Emissions('bus', distance * 0.6 * 1.60934);
+        routes.push(bikeBusRoute);
+      }
+
+      // Add a subway + shared ride combination for late night or areas with limited service
+      const subwaySharedRoute: RouteItem = {
+        id: '14',
+        name: 'Subway + Shared Ride Route',
+        duration: Math.round(distance * 6) + 15,
+        cost: parseFloat((2.90 + distance * 1.2).toFixed(2)),
+        comfort: 'high',
+        vectorScore: 0.75,
+        segments: [
+          {
+            mode: 'walk',
+            startLocation: from as string,
+            endLocation: 'Subway Station',
+            duration: 5,
+            cost: 0,
+            lineInfo: 'Walk to station',
+          },
+          {
+            mode: 'subway',
+            startLocation: 'Subway Station',
+            endLocation: 'Subway Station',
+            duration: Math.round(distance * 0.6 * 8),
+            cost: 2.90,
+            lineInfo: bestSubwayLine ? `${bestSubwayLine} Train` : 'Subway',
+          },
+          {
+            mode: 'shared',
+            startLocation: 'Subway Station',
+            endLocation: to as string,
+            duration: Math.round(distance * 0.4 * 4),
+            cost: parseFloat((distance * 1.2).toFixed(2)),
+            lineInfo: 'Shared Ride',
+          }
+        ],
+      };
+      subwaySharedRoute.balancedScore = calculateBalancedScore(subwaySharedRoute.duration, subwaySharedRoute.cost, subwaySharedRoute.comfort, 1);
+      subwaySharedRoute.co2 = 
+        calculateCO2Emissions('subway', distance * 0.6 * 1.60934) +
+        calculateCO2Emissions('shared', distance * 0.4 * 1.60934);
+      routes.push(subwaySharedRoute);
+
+      // Add an express subway route if available (limited stops)
+      if (bestSubwayLine && distance > 3) {
+        const expressSubwayRoute: RouteItem = {
+          id: '15',
+          name: 'Express Subway Route',
+          duration: Math.round(distance * 6) + 10,
+          cost: 2.90,
+          comfort: 'high',
+          vectorScore: 0.85,
+          segments: [
+            {
+              mode: 'walk',
+              startLocation: from as string,
+              endLocation: 'Express Station',
+              duration: 7,
+              cost: 0,
+              lineInfo: 'Walk to express station',
+            },
+            {
+              mode: 'subway',
+              startLocation: 'Express Station',
+              endLocation: 'Express Station',
+              duration: Math.round(distance * 6),
+              cost: 2.90,
+              lineInfo: `${bestSubwayLine} Express Train`,
+            },
+            {
+              mode: 'walk',
+              startLocation: 'Express Station',
+              endLocation: to as string,
+              duration: 7,
+              cost: 0,
+              lineInfo: 'Walk to destination',
+            }
+          ],
+        };
+        expressSubwayRoute.balancedScore = calculateBalancedScore(expressSubwayRoute.duration, expressSubwayRoute.cost, expressSubwayRoute.comfort, 1);
+        expressSubwayRoute.co2 = calculateCO2Emissions('subway', distance * 1.60934);
+        routes.push(expressSubwayRoute);
+      }
+
+      // Sort routes primarily by duration
+      routes.sort((a, b) => a.duration - b.duration);
 
       return routes;
     };
@@ -612,7 +1005,7 @@ export default async function handler(
       
       // Calculate traffic impact for road-based segments
       const roadBasedSegments = route.segments.filter(segment => 
-        segment.mode === 'bus' || segment.mode === 'uber' || segment.mode === 'taxi'
+        segment.mode === 'bus' || segment.mode === 'uber' || segment.mode === 'taxi' || segment.mode === 'shared'
       );
       const trafficImpact = roadBasedSegments.length > 0 ? avgTrafficFactor : 1.0;
       
@@ -642,23 +1035,21 @@ export default async function handler(
 
     // Only sort if we have routes
     if (mockRoutes.length > 0) {
-      // Sort routes by their balanced score (highest to lowest)
+      // Sort routes by duration (fastest first)
       mockRoutes.sort((a, b) => {
-        // Ensure we have valid scores
-        const scoreA = a.scores?.overall || a.balancedScore?.score || 0;
-        const scoreB = b.scores?.overall || b.balancedScore?.score || 0;
-        
-        // Sort in descending order (highest score first)
-        if (scoreA !== scoreB) {
-          return scoreB - scoreA;
+        // Primary sort by duration
+        if (a.duration !== b.duration) {
+          return a.duration - b.duration;
         }
         
-        // If scores are equal, prefer faster routes first
-        return (a.duration || 0) - (b.duration || 0);
+        // Secondary sort by balanced score if durations are equal
+        const scoreA = a.balancedScore?.score || 0;
+        const scoreB = b.balancedScore?.score || 0;
+        return scoreB - scoreA;
       });
 
-      // Add "best" indicator to the first route (now the best one)
-      mockRoutes[0].name = `${mockRoutes[0].name} (Best Route)`;
+      // Add "best" indicator to the fastest route
+      mockRoutes[0].name = `${mockRoutes[0].name} (Fastest Route)`;
     }
 
     // Return error if no routes found
