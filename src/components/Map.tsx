@@ -82,15 +82,15 @@ const generateWaypoints = (start: [number, number], end: [number, number], numPo
 
 // Component props
 interface MapProps {
-  from: string;
-  to: string;
-  route?: any;
+  segments: any[];
+  origin: string;
+  destination: string;
 }
 
 // Coordinates type
 type Coordinates = [number, number];
 
-const Map = ({ from, to, route }: MapProps) => {
+const Map = ({ origin, destination, segments }: MapProps) => {
   const [startCoords, setStartCoords] = useState<Coordinates | null>(null);
   const [endCoords, setEndCoords] = useState<Coordinates | null>(null);
   const [waypoints, setWaypoints] = useState<Record<string, Coordinates[]>>({});
@@ -164,27 +164,27 @@ const Map = ({ from, to, route }: MapProps) => {
     fixLeafletIcon();
     
     // Set start and end coordinates
-    if (from && to) {
-      const fromCoords = getCoordinates(from);
-      const toCoords = getCoordinates(to);
+    if (origin && destination) {
+      const fromCoords = getCoordinates(origin);
+      const toCoords = getCoordinates(destination);
       
       // Log coordinates for debugging
-      console.log(`Map - From location: "${from}" → coordinates: [${fromCoords[0]}, ${fromCoords[1]}]`);
-      console.log(`Map - To location: "${to}" → coordinates: [${toCoords[0]}, ${toCoords[1]}]`);
+      console.log(`Map - From location: "${origin}" → coordinates: [${fromCoords[0]}, ${fromCoords[1]}]`);
+      console.log(`Map - To location: "${destination}" → coordinates: [${toCoords[0]}, ${toCoords[1]}]`);
       
       setStartCoords(fromCoords);
       setEndCoords(toCoords);
       
       // Generate mock waypoints for each segment
-      if (route && route.segments) {
+      if (segments && segments.length > 0) {
         const segmentWaypoints: Record<string, Coordinates[]> = {};
         
         let lastEndpoint = fromCoords;
         
-        route.segments.forEach((segment: any, index: number) => {
-          const endpointCoords = index === route.segments.length - 1 
+        segments.forEach((segment: any, index: number) => {
+          const endpointCoords = index === segments.length - 1 
             ? toCoords 
-            : getCoordinates(segment.endLocation);
+            : getCoordinates(segment.endLocation || segment.to);
           
           // Generate some random waypoints between the two endpoints
           const numPoints = Math.floor(Math.random() * 3) + 1; // 1-3 random points
@@ -202,7 +202,7 @@ const Map = ({ from, to, route }: MapProps) => {
         setWaypoints(segmentWaypoints);
       }
     }
-  }, [from, to, route]);
+  }, [origin, destination, segments]);
   
   if (!startCoords || !endCoords) {
     return (
@@ -235,19 +235,19 @@ const Map = ({ from, to, route }: MapProps) => {
       {/* Start Marker */}
       <Marker position={startCoords}>
         <Popup>
-          <strong>Start:</strong> {from}
+          <strong>Start:</strong> {origin}
         </Popup>
       </Marker>
       
       {/* End Marker */}
       <Marker position={endCoords}>
         <Popup>
-          <strong>Destination:</strong> {to}
+          <strong>Destination:</strong> {destination}
         </Popup>
       </Marker>
       
       {/* Route Segments */}
-      {route && route.segments && route.segments.map((segment: any, index: number) => {
+      {segments && segments.length > 0 && segments.map((segment: any, index: number) => {
         const segmentPoints = waypoints[`segment-${index}`];
         
         if (!segmentPoints) return null;
@@ -271,6 +271,7 @@ const Map = ({ from, to, route }: MapProps) => {
                 <Popup>
                   <strong>{segment.mode.charAt(0).toUpperCase() + segment.mode.slice(1)}</strong>
                   {segment.lineInfo && <div><small>{segment.lineInfo}</small></div>}
+                  {segment.line && <div><small>{segment.line}</small></div>}
                 </Popup>
               </Marker>
             ))}

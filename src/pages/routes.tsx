@@ -70,15 +70,23 @@ const Routes = () => {
       }
       
       const data = await response.json();
-      setRoutes(data);
       
-      if (data.length > 0) {
-        setSelectedRoute(data[0].id);
-        setMapData(data[0].segments);
+      // Make sure data is an array before setting state
+      if (Array.isArray(data)) {
+        setRoutes(data);
+        
+        if (data.length > 0) {
+          setSelectedRoute(data[0].id);
+          setMapData(data[0].segments);
+        }
+      } else {
+        console.error('Expected array of routes but got:', data);
+        setRoutes([]);
       }
       
     } catch (error) {
       console.error('Error fetching routes:', error);
+      setRoutes([]);
     } finally {
       setLoading(false);
     }
@@ -187,7 +195,7 @@ const Routes = () => {
                   <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-honey-600"></div>
                   <span className="ml-3 text-gray-700">Finding the best routes...</span>
                 </div>
-              ) : routes.length === 0 ? (
+              ) : !routes || routes.length === 0 ? (
                 <div className="bg-white/90 backdrop-blur-sm rounded-lg shadow-lg p-6">
                   <div className="text-center py-8">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -201,7 +209,7 @@ const Routes = () => {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {routes.map((route) => (
+                  {Array.isArray(routes) && routes.map((route) => (
                     <div
                       key={route.id}
                       className={`bg-white/90 backdrop-blur-sm rounded-lg shadow-lg p-4 cursor-pointer transition-all hover:shadow-xl border-l-4 ${
@@ -290,7 +298,7 @@ const Routes = () => {
                 <div className="mt-6 bg-white/90 backdrop-blur-sm rounded-lg shadow-lg p-4">
                   <h3 className="text-lg font-bold mb-3">Route Details</h3>
                   <div className="space-y-4">
-                    {routes.find(r => r.id === selectedRoute)?.segments.map((segment, index) => (
+                    {Array.isArray(routes) && routes.length > 0 && routes.find(r => r.id === selectedRoute)?.segments.map((segment, index) => (
                       <div key={segment.id} className="border-l-2 border-gray-200 pl-4 pb-4 relative">
                         <div className="absolute -left-2 top-0 h-4 w-4 rounded-full bg-gray-200 flex items-center justify-center">
                           {getModeIcon(segment.mode)}
