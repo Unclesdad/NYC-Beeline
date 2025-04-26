@@ -126,6 +126,26 @@ const getRouteColor = (mode: string) => {
   }
 };
 
+// Add this after getRouteColor function and before interface RouteItem
+const calculateCO2Emissions = (mode: string, distanceKm: number): number => {
+  // CO2 emissions in grams per kilometer
+  const emissionsFactors: Record<string, number> = {
+    'subway': 30,     // Electric subway
+    'bus': 70,        // Bus (diesel)
+    'walk': 0,        // Walking - no emissions
+    'bike': 0,        // Biking - no emissions
+    'ebike': 5,       // E-bike - minimal emissions from electricity
+    'ferry': 120,     // Ferry
+    'taxi': 150,      // Taxi
+    'uber': 150,      // Uber
+    'shared': 90,     // Shared ride (per passenger)
+    'default': 100    // Default value
+  };
+
+  const emissionFactor = emissionsFactors[mode] || emissionsFactors.default;
+  return Math.round(emissionFactor * distanceKm);
+};
+
 // Define the route type
 interface RouteItem {
   id: string;
@@ -328,7 +348,6 @@ export default async function handler(
     const avgTrafficFactor = (originTraffic.factor + destinationTraffic.factor) / 2;
     const avgTopologyDifficulty = (originTopology + destinationTopology) / 2;
     
-    // Routes generation logic
     const generateRoutes = () => {
       const routes: RouteItem[] = [];
       
@@ -670,6 +689,25 @@ export default async function handler(
         
         // Generate route color based on overall score
         const routeColor = getRouteColorFromScore(scores.score);
+        
+        // Calculate CO2 emissions for the entire route
+        let totalCO2 = 0;
+        route.segments.forEach((segment: any) => {
+          // Calculate segment distance in km
+          const segmentDistance = segment.distance || 
+                                 (calculateDistance(
+                                   fromCoords[0], fromCoords[1], 
+                                   toCoords[0], toCoords[1]
+                                 ) * 1.5); // Use a multiplier to account for non-direct routes
+          
+          // Calculate CO2 for this segment
+          const segmentCO2 = calculateCO2Emissions(segment.mode, segmentDistance);
+          segment.co2 = segmentCO2;
+          totalCO2 += segmentCO2;
+        });
+        
+        // Set total CO2 for the route
+        route.co2 = totalCO2;
         
         // Generate path data for map
         const pathData = generatePathData(route);

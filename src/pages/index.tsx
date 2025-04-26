@@ -4,6 +4,7 @@ import Image from 'next/image';
 import Layout from '@/components/Layout';
 import AnimatedBackground from '@/components/AnimatedBackground';
 import axios from 'axios';
+import EmergencyButton from '@/components/EmergencyButton';
 
 // Custom styles for range sliders across browsers
 const sliderStyles = `
@@ -228,7 +229,7 @@ export default function Home() {
       <AnimatedBackground theme="honey" intensity="medium" pattern="hexagon">
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24">
           <div className="lg:grid lg:grid-cols-2 lg:gap-12 items-center">
-            <div>
+            <div className="text-center lg:text-left">
               <h2 className="text-4xl font-extrabold text-gray-900 sm:text-5xl sm:tracking-tight lg:text-6xl">
                 Find your optimal <span className="text-honey-600">path</span> across NYC
               </h2>
@@ -583,6 +584,13 @@ export default function Home() {
           </div>
         </section>
       </AnimatedBackground>
+      
+      {/* Emergency Button */}
+      <EmergencyButton 
+        onRouteToHospital={(hospital) => {
+          router.push(`/route-planner?from=${encodeURIComponent(origin || 'Your Location')}&to=${encodeURIComponent(hospital.name)}&priority=speed&noise=moderate&safety=high`);
+        }}
+      />
     </Layout>
   );
 } 

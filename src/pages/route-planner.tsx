@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import Layout from '@/components/Layout';
 import dynamic from 'next/dynamic';
 import AnimatedBackground from '@/components/AnimatedBackground';
+import EmergencyButton from '@/components/EmergencyButton';
 
 // Import Map component dynamically to avoid SSR issues
 const Map = dynamic(() => import('@/components/Map'), { ssr: false });
@@ -617,6 +618,27 @@ const Routes = () => {
           </div>
         </div>
       </AnimatedBackground>
+      
+      {/* Emergency Button */}
+      <EmergencyButton 
+        userLocation={mapData.length > 0 ? undefined : undefined} 
+        onRouteToHospital={(hospital) => {
+          // Get the current starting location
+          const currentStart = from || "Your Location";
+          // Update route with emergency destination
+          router.push({
+            pathname: '/route-planner',
+            query: {
+              from: currentStart,
+              to: hospital.name,
+              priority: 'speed',
+              noise: 'moderate',
+              safety: 'high',
+              emergency: 'true' // Add flag to indicate this is an emergency route
+            }
+          });
+        }}
+      />
     </Layout>
   );
 };
