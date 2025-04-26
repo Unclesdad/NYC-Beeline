@@ -73,11 +73,47 @@ const Routes = () => {
       
       // API returns an object with a 'routes' property containing the array
       if (data && data.routes && Array.isArray(data.routes)) {
-        setRoutes(data.routes);
+        // Process route data to match expected format
+        const processedRoutes = data.routes.map((route: any) => {
+          // Process each segment to ensure it has the expected properties
+          const processedSegments = route.segments ? route.segments.map((segment: any, idx: number) => {
+            return {
+              id: segment.id || `segment-${idx}`,
+              mode: segment.mode || 'walk',
+              line: segment.lineInfo || segment.line || '',
+              from: segment.startLocation || segment.from || '',
+              to: segment.endLocation || segment.to || '',
+              duration: segment.duration || 0,
+              cost: segment.cost || 0,
+              steps: segment.steps || [{ instruction: segment.lineInfo || `Travel via ${segment.mode}` }],
+              transfers: segment.transfers || 0,
+              congestion: segment.congestion || 'medium',
+              startTime: segment.startTime || new Date().toISOString(),
+              endTime: segment.endTime || new Date().toISOString(),
+              color: segment.color || getRouteColor(segment.mode),
+              accessibility: segment.accessibility || true,
+              crowdLevel: segment.crowdLevel || 'medium',
+              co2: segment.co2 || 0,
+              path: segment.path || [],
+            };
+          }) : [];
+          
+          return {
+            id: route.id || `route-${Math.random().toString(36).substring(2, 9)}`,
+            totalDuration: route.duration || 0,
+            totalCost: route.cost || 0,
+            totalDistance: route.distance || 0,
+            comfortScore: route.comfort === 'high' ? 9 : route.comfort === 'medium' ? 6 : 3,
+            segments: processedSegments,
+            totalCO2: route.co2 || 0
+          };
+        });
         
-        if (data.routes.length > 0) {
-          setSelectedRoute(data.routes[0].id);
-          setMapData(data.routes[0].segments);
+        setRoutes(processedRoutes);
+        
+        if (processedRoutes.length > 0) {
+          setSelectedRoute(processedRoutes[0].id);
+          setMapData(processedRoutes[0].segments);
         }
       } else {
         console.error('Expected object with routes array but got:', data);
@@ -97,6 +133,28 @@ const Routes = () => {
     if (score >= 8) return 'text-success';
     if (score >= 5) return 'text-warning';
     return 'text-danger';
+  };
+
+  // Helper function to get route color for different modes
+  const getRouteColor = (mode: string) => {
+    switch (mode) {
+      case 'subway':
+        return '#3b82f6';  // blue-500
+      case 'bus':
+        return '#22c55e';  // green-500
+      case 'bike':
+      case 'ebike':
+        return '#8b5cf6';  // purple-500
+      case 'taxi':
+      case 'uber':
+        return '#f59e0b';  // amber-500
+      case 'walk':
+        return '#6b7280';  // gray-500
+      case 'ferry':
+        return '#06b6d4';  // cyan-500
+      default:
+        return '#ef4444';  // red-500
+    }
   };
 
   // Helper function to get mode icon
@@ -171,7 +229,7 @@ const Routes = () => {
 
   return (
     <Layout currentPage="routes">
-      <AnimatedBackground theme="honey" intensity="low">
+      <AnimatedBackground theme="honey" intensity="medium" pattern="hexagon">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex flex-col lg:flex-row gap-6">
             {/* Route Options */}
@@ -229,8 +287,8 @@ const Routes = () => {
                         <div>
                           <span className="text-lg font-bold">{formatTime(route.totalDuration)}</span>
                           <div className="text-sm text-gray-600">
-                            {route.segments.map((segment, idx) => (
-                              <span key={segment.id} className="inline-flex items-center mr-2">
+                            {route.segments && Array.isArray(route.segments) && route.segments.map((segment, idx) => (
+                              <span key={segment.id || `segment-${idx}`} className="inline-flex items-center mr-2">
                                 <span className={`inline-block w-6 h-6 rounded-full flex items-center justify-center ${
                                   segment.mode === 'subway' ? 'bg-blue-600' :
                                   segment.mode === 'bus' ? 'bg-green-600' :
@@ -272,14 +330,14 @@ const Routes = () => {
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
                             </svg>
-                            {route.segments.length - 1} transfer{route.segments.length - 1 !== 1 ? 's' : ''}
+                            {route.segments && Array.isArray(route.segments) ? route.segments.length - 1 : 0} transfer{(!route.segments || !Array.isArray(route.segments) || route.segments.length - 1 !== 1) ? 's' : ''}
                           </span>
                         </div>
                         <div key={`co2-${route.id}`} className="text-gray-600 flex items-center">
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
                           </svg>
-                          {Math.round(route.totalCO2)} g CO2
+                          {Math.round(route.totalCO2 || 0)} g CO2
                         </div>
                       </div>
                     </div>
@@ -347,7 +405,7 @@ const Routes = () => {
                           )}
                         </div>
                         
-                        {segment.transfers > 0 && (
+                        {segment.transfers !== undefined && segment.transfers > 0 && (
                           <div className="mt-2 text-sm text-gray-600 ml-4">
                             {segment.transfers} transfer{segment.transfers > 1 ? 's' : ''}
                           </div>

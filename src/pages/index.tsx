@@ -23,7 +23,7 @@ export default function Home() {
 
   return (
     <Layout currentPage="home">
-      <AnimatedBackground theme="honey" intensity="medium">
+      <AnimatedBackground theme="honey" intensity="medium" pattern="hexagon">
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24">
           <div className="lg:grid lg:grid-cols-2 lg:gap-12 items-center">
             <div>
