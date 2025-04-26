@@ -2,11 +2,6 @@
   "/_app": "pages/_app.js",
   "/_error": "pages/_error.js",
   "/_document": "pages/_document.js",
-  "/": "pages/index.js",
-<<<<<<< HEAD
   "/route-planner": "pages/route-planner.js",
-=======
->>>>>>> 15194d4dd3331d0655f24d03958277489fbb36ae
-  "/api/address-suggestions": "pages/api/address-suggestions.js",
-  "/api/routes": "pages/api/routes.js"
+  "/": "pages/index.js"
 }
